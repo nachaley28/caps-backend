@@ -1,14 +1,15 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request,session
 from flask_cors import CORS, cross_origin
 from flask_mysqldb import MySQL
 
 app = Flask(__name__)
-CORS(app)
+
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'labguard'
-
+app.config['SECRET_KEY'] = 'labguardsecretkey'
+CORS(app, origins="*")
 mysql = MySQL(app)
 
 @app.route('/signup', methods=['POST'])
@@ -45,7 +46,9 @@ def login():
         cursor.execute("SELECT lgid, name, email, role, year, password FROM users WHERE email = %s", (email,))
         user = cursor.fetchone()
         cursor.close()
-
+        session['user'] = user
+        current_user = user
+        print("The current user is", current_user)
         if not user:
             return jsonify({"msg": "User not found"}), 404
 
@@ -71,20 +74,20 @@ def login():
 @app.route('/add_report', methods=['POST'])
 @cross_origin()
 def add_report():
+    
+    email = request.headers.get("X-User-Email")
     report = request.json.get('data')
-    user_id = request.json.get('id')
+    print(report)
     lab = report['lab']
     item = report['item']
+    label = report['label']
     quantity = report['quantity']
     status = report['status']
-    issue = report['issue']
     notes = report['notes']
-    image = report['image']
-    submitted_by = report['submitted_by']
 
     cursor = mysql.connection.cursor()
-    cursor.execute("INSERT INTO reports (id,lab,item,quantity,status,issue,notes,image_path,submitted_by) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                   (user_id, lab, item, quantity, status, issue, notes, image, submitted_by))
+    cursor.execute("INSERT INTO reports (lab,item,quantity,status,notes,submitted_by,label) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                   ( lab, item, quantity, status, notes, email,label))
     mysql.connection.commit()
     cursor.close()
 
@@ -101,6 +104,8 @@ def get_reports():
         cursor.close()
 
         reports = [dict(zip(col_names, row)) for row in rows]
+
+
 
         return jsonify(reports), 200
     except Exception as e:
@@ -177,5 +182,135 @@ def dashboard_data():
         "operational_stats": operational_stats
     })
 
+@app.route('/get_inventory', methods=["GET"])
+@cross_origin()
+def get_inventory():
+    email = request.headers.get("X-User-Email")
+    role = request.headers.get("X-User-Id")
+    final_data = []
+    # user = session.get('user')
+    print(email,role)
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM inventory")
+    data = cursor.fetchall()
+    for  result in data:
+        item = {
+            
+            'id' : result[0],
+            'category' : result[1],
+            'name' : result[2],
+            'lab' : result[3],
+            'specs' : result[4],
+            'quantity' : result[5],
+            'status': result[6]
+        }
+        final_data.append(item)
+    
+    return final_data
+
+@app.route('/add_laboratory', methods=['POST'])
+def add_laboratory():
+    data = request.json.get('data')
+
+    lab_name = data.get('lab_name')
+    location = data.get('location')
+
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("INSERT INTO laboratory (lab_name, location) VALUES (%s,%s)",(lab_name,location,))
+    mysql.connection.commit()
+
+    return "success"
+
+@app.route('/get_laboratory', methods=['GET'])
+def get_laboratory():
+    final_data = []
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("SELECT * FROM laboratory")
+    data = cursor.fetchall()
+
+    for i in data:
+        labs = {
+            "id" : i[0],
+            "name" : i[1],
+            "location" : i[2]
+        }
+
+        final_data.append(labs)
+
+    return final_data
+
+@app.route('/get_computer', methods=["GET"])
+def get_computer():
+    final_data = []
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("SELECT * FROM computer_equipments")
+    data = cursor.fetchall()
+
+    for i in data:
+        computer = {
+            "id" : i[2],
+            "name" : i[3],
+            "spec" : i[0],
+            "lab" : i[1]
+        }
+
+        final_data.append(computer)
+
+    return final_data
+
+@app.route('/add_computer', methods=["POST"])
+def add_computer():
+    data = request.json.get('data')
+    
+    name = data.get('name')
+    lab_name = data.get('lab_name')
+    spec = data.get('spec')
+    print(lab_name)
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("INSERT INTO computer_equipments (specs,assign,name) VALUES (%s,%s,%s)",(spec,lab_name,name))
+    mysql.connection.commit()
+
+    return "success"
+
+
+@app.route('/get_accessories', methods=["GET"])
+def get_accessories():
+    final_data = []
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("SELECT * FROM accessories_equipment")
+    data = cursor.fetchall()
+
+    for i in data:
+        computer = {
+            "id" : i[2],
+            "name" : i[3],
+            "spec" : i[0],
+            "lab" : i[1]
+        }
+
+        final_data.append(computer)
+
+    return final_data
+
+@app.route('/add_accessories', methods=["POST"])
+def add_accessories():
+    data = request.json.get('data')
+    
+    name = data.get('name')
+    lab_name = data.get('lab_name')
+    spec = data.get('spec')
+    print(lab_name)
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("INSERT INTO accessories_equipment (spec,lab,name) VALUES (%s,%s,%s)",(spec,lab_name,name))
+    mysql.connection.commit()
+
+    return "success"
+    
 if __name__ == '__main__':
     app.run(debug=True)
