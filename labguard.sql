@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 17, 2025 at 09:45 AM
+-- Generation Time: Sep 04, 2025 at 11:13 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,6 +20,46 @@ SET time_zone = "+00:00";
 --
 -- Database: `labguard`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `accessories_equipment`
+--
+
+CREATE TABLE `accessories_equipment` (
+  `spec` text NOT NULL,
+  `lab` text NOT NULL,
+  `id` int(11) NOT NULL,
+  `name` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `accessories_equipment`
+--
+
+INSERT INTO `accessories_equipment` (`spec`, `lab`, `id`, `name`) VALUES
+('2', 'Justin (Cl3)', 1, '2');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `computer_equipments`
+--
+
+CREATE TABLE `computer_equipments` (
+  `specs` text NOT NULL,
+  `assign` text NOT NULL,
+  `id` int(11) NOT NULL,
+  `name` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `computer_equipments`
+--
+
+INSERT INTO `computer_equipments` (`specs`, `assign`, `id`, `name`) VALUES
+('1', 'Justin (Cl3)', 1, '1');
 
 -- --------------------------------------------------------
 
@@ -53,6 +93,51 @@ INSERT INTO `equipment` (`id`, `name`, `lab_id`, `status`) VALUES
 (12, 'Scanner', 6, 'Operational'),
 (13, 'Desk', 7, 'Operational'),
 (14, 'Chair', 7, 'Not Operational');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory`
+--
+
+CREATE TABLE `inventory` (
+  `id` int(11) NOT NULL,
+  `category` text NOT NULL,
+  `name` text NOT NULL,
+  `lab` text NOT NULL,
+  `specs` text NOT NULL,
+  `quantity` int(11) NOT NULL,
+  `status` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `inventory`
+--
+
+INSERT INTO `inventory` (`id`, `category`, `name`, `lab`, `specs`, `quantity`, `status`) VALUES
+(1, '1', '1', '1', '1', 0, '1'),
+(2, '1', '1', '1', '1', 0, '1');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `laboratory`
+--
+
+CREATE TABLE `laboratory` (
+  `id` int(11) NOT NULL,
+  `lab_name` text NOT NULL,
+  `location` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `laboratory`
+--
+
+INSERT INTO `laboratory` (`id`, `lab_name`, `location`) VALUES
+(1, 'Cl3', 'Cl3'),
+(2, '1', '1'),
+(3, 'Justin', 'Cl3');
 
 -- --------------------------------------------------------
 
@@ -94,17 +179,20 @@ CREATE TABLE `reports` (
   `label` text NOT NULL,
   `image_path` varchar(255) DEFAULT NULL,
   `submitted_by` varchar(20) NOT NULL,
-  `timestamp` text NOT NULL
+  `timestamp` text NOT NULL,
+  `report_status` int(11) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `reports`
 --
 
-INSERT INTO `reports` (`id`, `lab`, `item`, `quantity`, `status`, `notes`, `label`, `image_path`, `submitted_by`, `timestamp`) VALUES
-(7, 'Computer Lab 2', 'Projector', 1, 'Missing', 'Reported to admin', 'Not Operational', 'images/projector1.jpg', 'AD-1234', ''),
-(8, 'Computer Lab 3', 'Chair', 3, 'Damaged', 'Replace with new chairs', 'Operational', 'images/chair1.jpg', 'LA-5678', ''),
-(10, 'Computer Lab 5', 'Mouse', 7, 'Missing', 'Check inventory logs', 'Not Operational', 'images/mouse1.jpg', 'AD-2345', '');
+INSERT INTO `reports` (`id`, `lab`, `item`, `quantity`, `status`, `notes`, `label`, `image_path`, `submitted_by`, `timestamp`, `report_status`) VALUES
+(7, 'Computer Lab 2', 'Projector', 1, 'Missing', 'Reported to admin', 'Not Operational', 'images/projector1.jpg', 'AD-1234', '', 1),
+(8, 'Computer Lab 3', 'Chair', 3, 'Damaged', 'Replace with new chairs', 'Operational', 'images/chair1.jpg', 'LA-5678', '', 0),
+(10, 'Computer Lab 5', 'Mouse', 7, 'Missing', 'Check inventory logs', 'Not Operational', 'images/mouse1.jpg', 'AD-2345', '', 0),
+(22, 'Computer Lab 1', 'damage test', 11, 'Damage', '1', 'Not Operational', NULL, 'natnat@gmail.com', '', 0),
+(23, 'Computer Lab 1', 'damage test', 4, 'Missing', '5', 'Not Operational', NULL, 'natnat@gmail.com', '', 0);
 
 -- --------------------------------------------------------
 
@@ -140,11 +228,35 @@ INSERT INTO `users` (`lgid`, `name`, `email`, `role`, `year`, `password`) VALUES
 --
 
 --
+-- Indexes for table `accessories_equipment`
+--
+ALTER TABLE `accessories_equipment`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `computer_equipments`
+--
+ALTER TABLE `computer_equipments`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `equipment`
 --
 ALTER TABLE `equipment`
   ADD PRIMARY KEY (`id`),
   ADD KEY `lab_id` (`lab_id`);
+
+--
+-- Indexes for table `inventory`
+--
+ALTER TABLE `inventory`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `laboratory`
+--
+ALTER TABLE `laboratory`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `labs`
@@ -156,8 +268,7 @@ ALTER TABLE `labs`
 -- Indexes for table `reports`
 --
 ALTER TABLE `reports`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `reports_ibfk_1` (`submitted_by`);
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `users`
@@ -171,10 +282,34 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT for table `accessories_equipment`
+--
+ALTER TABLE `accessories_equipment`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `computer_equipments`
+--
+ALTER TABLE `computer_equipments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT for table `equipment`
 --
 ALTER TABLE `equipment`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+
+--
+-- AUTO_INCREMENT for table `inventory`
+--
+ALTER TABLE `inventory`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `laboratory`
+--
+ALTER TABLE `laboratory`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `labs`
@@ -186,7 +321,7 @@ ALTER TABLE `labs`
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- Constraints for dumped tables
@@ -197,12 +332,6 @@ ALTER TABLE `reports`
 --
 ALTER TABLE `equipment`
   ADD CONSTRAINT `equipment_ibfk_1` FOREIGN KEY (`lab_id`) REFERENCES `labs` (`id`);
-
---
--- Constraints for table `reports`
---
-ALTER TABLE `reports`
-  ADD CONSTRAINT `reports_ibfk_1` FOREIGN KEY (`submitted_by`) REFERENCES `users` (`lgid`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
