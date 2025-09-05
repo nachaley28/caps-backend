@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 04, 2025 at 11:13 AM
+-- Generation Time: Sep 05, 2025 at 08:38 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -110,14 +110,6 @@ CREATE TABLE `inventory` (
   `status` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `inventory`
---
-
-INSERT INTO `inventory` (`id`, `category`, `name`, `lab`, `specs`, `quantity`, `status`) VALUES
-(1, '1', '1', '1', '1', 0, '1'),
-(2, '1', '1', '1', '1', 0, '1');
-
 -- --------------------------------------------------------
 
 --
@@ -136,7 +128,6 @@ CREATE TABLE `laboratory` (
 
 INSERT INTO `laboratory` (`id`, `lab_name`, `location`) VALUES
 (1, 'Cl3', 'Cl3'),
-(2, '1', '1'),
 (3, 'Justin', 'Cl3');
 
 -- --------------------------------------------------------
@@ -179,20 +170,9 @@ CREATE TABLE `reports` (
   `label` text NOT NULL,
   `image_path` varchar(255) DEFAULT NULL,
   `submitted_by` varchar(20) NOT NULL,
-  `timestamp` text NOT NULL,
+  `timestamp` text NOT NULL DEFAULT current_timestamp(),
   `report_status` int(11) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `reports`
---
-
-INSERT INTO `reports` (`id`, `lab`, `item`, `quantity`, `status`, `notes`, `label`, `image_path`, `submitted_by`, `timestamp`, `report_status`) VALUES
-(7, 'Computer Lab 2', 'Projector', 1, 'Missing', 'Reported to admin', 'Not Operational', 'images/projector1.jpg', 'AD-1234', '', 1),
-(8, 'Computer Lab 3', 'Chair', 3, 'Damaged', 'Replace with new chairs', 'Operational', 'images/chair1.jpg', 'LA-5678', '', 0),
-(10, 'Computer Lab 5', 'Mouse', 7, 'Missing', 'Check inventory logs', 'Not Operational', 'images/mouse1.jpg', 'AD-2345', '', 0),
-(22, 'Computer Lab 1', 'damage test', 11, 'Damage', '1', 'Not Operational', NULL, 'natnat@gmail.com', '', 0),
-(23, 'Computer Lab 1', 'damage test', 4, 'Missing', '5', 'Not Operational', NULL, 'natnat@gmail.com', '', 0);
 
 -- --------------------------------------------------------
 
@@ -214,8 +194,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`lgid`, `name`, `email`, `role`, `year`, `password`) VALUES
-('', 'Natalie Jenh Alarcon', 'natnat@gmail.com', 'Lab Assistant', '4th Year', '123'),
-('AD-1001', 'Frank White', 'frank@example.com', 'Admin', NULL, 'adminpass'),
+('1', 'Natalie Jenh Alarcon', 'natnat@gmail.com', 'Lab Assistant', '4th Year', '123'),
 ('AD-1234', 'Admin ', 'admin@example.com', 'Admin', '0', 'adminpass'),
 ('AD-123456789', 'Admin', 'admin.ui@phinmaed.com', 'Admin', NULL, 'Admin1234'),
 ('AD-2345', ' Admin', 'admin2@example.com', 'Admin', '0', 'admin2pass'),
@@ -321,7 +300,7 @@ ALTER TABLE `labs`
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- Constraints for dumped tables
