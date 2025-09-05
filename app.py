@@ -12,6 +12,169 @@ app.config['SECRET_KEY'] = 'labguardsecretkey'
 CORS(app, origins="*")
 mysql = MySQL(app)
 
+@app.route('/get_users')
+def get_users():
+    users = []
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT * FROM users")
+    data = cursor.fetchall()
+    for profile in data:
+        userProfile =    {
+                "lgid": profile[0],
+                "name": profile[1],
+                "email": profile[2],
+                "role": profile[3],
+                "year": profile[4],
+                "password": profile[5]
+            }
+        users.append(userProfile)
+
+    return users
+
+@app.route('/delete_user/<email>', methods=['DELETE'])
+def delete_user(email):
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute("DELETE FROM users WHERE email = %s", (email,))
+        mysql.connection.commit()
+        cursor.close()
+        return {"message": f"User with email {email} deleted successfully"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+    
+@app.route('/delete_report/<id>', methods=['DELETE'])
+def delete_report(id):
+    if id == "ALL":
+        try:
+            cursor = mysql.connection.cursor()
+            cursor.execute("DELETE FROM reports")
+            mysql.connection.commit()
+            cursor.close()
+            return {"message": f"Deleted successfully"}, 200
+        except Exception as e:
+            return {"error": str(e)}, 500
+    else:
+        try:
+            cursor = mysql.connection.cursor()
+            cursor.execute("DELETE FROM reports WHERE id = %s", (id,))
+            mysql.connection.commit()
+            cursor.close()
+            return {"message": f"Deleted successfully"}, 200
+        except Exception as e:
+            return {"error": str(e)}, 500
+        
+@app.route('/delete_lab/<int:id>', methods=['DELETE'])
+def delete_lab(id):
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute("DELETE FROM laboratory WHERE id = %s", (id,))
+        mysql.connection.commit()
+        cursor.close()
+        return {"message": "Lab deleted"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+        
+@app.route('/delete_inventory/<id>', methods=['DELETE'])
+def delete_inventory(id):
+    if id == "ALL":
+        try:
+            cursor = mysql.connection.cursor()
+            cursor.execute("DELETE FROM inventory")
+            mysql.connection.commit()
+            cursor.close()
+            return {"message": f"Deleted successfully"}, 200
+        except Exception as e:
+            return {"error": str(e)}, 500
+    else:
+        try:
+            cursor = mysql.connection.cursor()
+            cursor.execute("DELETE FROM inventory WHERE id = %s", (id,))
+            mysql.connection.commit()
+            cursor.close()
+            return {"message": f"Deleted successfully"}, 200
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+
+@app.route('/get_data')
+@cross_origin()
+def get_data():
+
+    cursor = mysql.connection.cursor()
+
+    # Users
+    cursor.execute("SELECT * FROM users")
+    users = cursor.fetchall()
+    total_users = len(users)
+    active_users = sum(1 for u in users if u[4] != "0" and u[4] is not None)
+    inactive_users = total_users - active_users
+
+    # Labs
+    cursor.execute("SELECT * FROM labs")
+    labs = cursor.fetchall()
+    total_labs = len(labs)
+
+    # Equipment
+    cursor.execute("SELECT * FROM equipment")
+    equipment = cursor.fetchall()
+    total_equipments = len(equipment)
+    equipments_operation = sum(1 for e in equipment if e[3] == "Operational")
+    equipments_not_operation = total_equipments - equipments_operation
+
+    # Reports
+    cursor.execute("SELECT * FROM reports")
+    reports = cursor.fetchall()
+    reports_submitted = len(reports)
+    damaged = sum(1 for r in reports if "Damage" in r[4] or "Damaged" in r[4])
+    missing = sum(1 for r in reports if "Missing" in r[4])
+
+    # Lab Equipment breakdown (per lab)
+    lab_equipments = []
+    for lab in labs:
+        lab_id, lab_name = lab
+        total = sum(1 for e in equipment if e[2] == lab_id)
+        damaged_count = sum(1 for r in reports if r[1] == lab_name and ("Damage" in r[4] or "Damaged" in r[4]))
+        missing_count = sum(1 for r in reports if r[1] == lab_name and "Missing" in r[4])
+        lab_equipments.append({
+            "lab": lab_name,
+            "total": total,
+            "damaged": damaged_count,
+            "missing": missing_count
+        })
+
+    # Equipment Damage Stats (group by equipment type)
+    equipment_damage_stats = []
+    equipment_names = set(e[1] for e in equipment)
+    for eq_name in equipment_names:
+        damaged_count = sum(1 for r in reports if r[2] == eq_name and ("Damage" in r[4] or "Damaged" in r[4]))
+        missing_count = sum(1 for r in reports if r[2] == eq_name and "Missing" in r[4])
+        if damaged_count > 0 or missing_count > 0:
+            equipment_damage_stats.append({
+                "name": eq_name,
+                "damaged": damaged_count,
+                "missing": missing_count
+            })
+
+    cursor.close()
+
+    return {
+        "stats": {
+            "totalLabs": total_labs,
+            "totalEquipments": total_equipments,
+            "equipmentsOperation": equipments_operation,
+            "equipmentsNotOperation": equipments_not_operation,
+            "totalUsers": total_users,
+            "activeUsers": active_users,
+            "inactiveUsers": inactive_users,
+            "reportsSubmitted": reports_submitted,
+            "damaged": damaged,
+            "missing": missing,
+        },
+        "labEquipments": lab_equipments,
+        "equipmentDamageStats": equipment_damage_stats,
+    }
+
+
 @app.route('/signup', methods=['POST'])
 @cross_origin()
 def signup():
@@ -104,6 +267,7 @@ def get_reports():
         cursor.close()
 
         reports = [dict(zip(col_names, row)) for row in rows]
+        
 
 
 
