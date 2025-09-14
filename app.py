@@ -512,20 +512,22 @@ def get_admin_computer_reports():
             "systemUnit": systemUnit,
             "wifi": wifi,
         }
+        
 
         for part, status in parts.items():
             if status != "operational":
+                cur.execute(f"SELECT lab_name FROM computer_equipments WHERE id = %s",(com_id,))
+                computer_equipments = cur.fetchone()[0]
                 report = {
                     "id": status_id,                  
                     "item": f"PC-{com_id}",               
-                    "lab": "Lab A",                     
+                    "lab": computer_equipments,                     
                     "status": status.capitalize(),        
                     "date": datetime.now().isoformat(),    
                     "notes": f"{part} issue detected",     
                 }
                 reports.append(report)
 
-                # Insert into `reports` table
                 cur.execute("""
                     INSERT INTO reports (com_id, lab, status, created_at, notes)
                     VALUES (%s, %s, %s, %s, %s)
