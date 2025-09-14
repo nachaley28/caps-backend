@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 05, 2025 at 08:38 AM
+-- Generation Time: Sep 14, 2025 at 01:39 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -24,42 +24,52 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
--- Table structure for table `accessories_equipment`
---
-
-CREATE TABLE `accessories_equipment` (
-  `spec` text NOT NULL,
-  `lab` text NOT NULL,
-  `id` int(11) NOT NULL,
-  `name` text NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `accessories_equipment`
---
-
-INSERT INTO `accessories_equipment` (`spec`, `lab`, `id`, `name`) VALUES
-('2', 'Justin (Cl3)', 1, '2');
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `computer_equipments`
 --
 
 CREATE TABLE `computer_equipments` (
-  `specs` text NOT NULL,
-  `assign` text NOT NULL,
-  `id` int(11) NOT NULL,
-  `name` text NOT NULL
+  `pc_name` varchar(50) DEFAULT NULL,
+  `lab_name` varchar(100) DEFAULT NULL,
+  `specs` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`specs`)),
+  `id` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `computer_equipments`
 --
 
-INSERT INTO `computer_equipments` (`specs`, `assign`, `id`, `name`) VALUES
-('1', 'Justin (Cl3)', 1, '1');
+INSERT INTO `computer_equipments` (`pc_name`, `lab_name`, `specs`, `id`) VALUES
+('21424', 'Justin', '{\"monitor\":\"21424\",\"systemUnit\":\"21424\",\"keyboard\":\"21424\",\"mouse\":\"21424\",\"headphone\":\"21424\",\"hdmi\":\"21424\",\"power\":\"21424\",\"wifi\":\"21424\"}', '13782527'),
+('1', 'Cl3', '{\"monitor\":\"1\",\"systemUnit\":\"1\",\"keyboard\":\"1\",\"mouse\":\"1\",\"headphone\":\"1\",\"hdmi\":\"1\",\"power\":\"1\",\"wifi\":\"1\"}', '17939919'),
+('r', 'Cl3', '{\"monitor\":\"r\",\"systemUnit\":\"r\",\"keyboard\":\"r\",\"mouse\":\"r\",\"headphone\":\"r\",\"hdmi\":\"r\",\"power\":\"r\",\"wifi\":\"r\"}', '71130950');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `computer_status`
+--
+
+CREATE TABLE `computer_status` (
+  `com_id` text NOT NULL DEFAULT 'operational',
+  `hdmi` text NOT NULL DEFAULT 'operational',
+  `headphone` text NOT NULL DEFAULT 'operational',
+  `keyboard` text NOT NULL DEFAULT 'operational',
+  `monitor` text NOT NULL DEFAULT 'operational',
+  `mouse` text NOT NULL DEFAULT 'operational',
+  `power` text NOT NULL DEFAULT 'operational',
+  `systemUnit` text NOT NULL DEFAULT 'operational',
+  `wifi` text NOT NULL DEFAULT 'operational',
+  `status_id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `computer_status`
+--
+
+INSERT INTO `computer_status` (`com_id`, `hdmi`, `headphone`, `keyboard`, `monitor`, `mouse`, `power`, `systemUnit`, `wifi`, `status_id`) VALUES
+('17939919', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 62074493),
+('71130950', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'damaged', 'operational', 84333131),
+('13782527', 'operational', 'damaged', 'operational', 'operational', 'operational', 'damaged', 'operational', 'operational', 25807771);
 
 -- --------------------------------------------------------
 
@@ -127,8 +137,7 @@ CREATE TABLE `laboratory` (
 --
 
 INSERT INTO `laboratory` (`id`, `lab_name`, `location`) VALUES
-(1, 'Cl3', 'Cl3'),
-(3, 'Justin', 'Cl3');
+(1, 'Cl3', 'Cl3');
 
 -- --------------------------------------------------------
 
@@ -162,17 +171,51 @@ INSERT INTO `labs` (`id`, `name`) VALUES
 
 CREATE TABLE `reports` (
   `id` int(11) NOT NULL,
-  `lab` varchar(100) NOT NULL,
-  `item` varchar(100) NOT NULL,
-  `quantity` int(11) NOT NULL,
-  `status` varchar(50) NOT NULL,
+  `com_id` varchar(50) DEFAULT NULL,
+  `part` varchar(50) DEFAULT NULL,
+  `status` varchar(50) DEFAULT NULL,
+  `lab` varchar(100) DEFAULT NULL,
+  `submitted_by` varchar(100) DEFAULT 'System',
   `notes` text DEFAULT NULL,
-  `label` text NOT NULL,
-  `image_path` varchar(255) DEFAULT NULL,
-  `submitted_by` varchar(20) NOT NULL,
-  `timestamp` text NOT NULL DEFAULT current_timestamp(),
-  `report_status` int(11) NOT NULL DEFAULT 0
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `reports`
+--
+
+INSERT INTO `reports` (`id`, `com_id`, `part`, `status`, `lab`, `submitted_by`, `notes`, `created_at`) VALUES
+(1, '71130950', 'systemUnit', 'damaged', 'Unknown', 'System', '', '2025-09-14 11:19:17'),
+(2, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:23:57'),
+(3, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:29:26'),
+(4, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:41'),
+(5, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:41'),
+(6, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:42'),
+(7, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:42'),
+(8, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:50'),
+(9, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:30:50'),
+(10, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:30:50'),
+(11, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:51'),
+(12, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:30:51'),
+(13, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:30:51'),
+(14, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:52'),
+(15, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:30:52'),
+(16, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:30:52'),
+(17, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:30:53'),
+(18, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:30:53'),
+(19, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:30:53'),
+(20, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:31:06'),
+(21, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:31:06'),
+(22, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:31:06'),
+(23, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:31:06'),
+(24, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:31:06'),
+(25, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:31:06'),
+(26, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:39:07'),
+(27, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:39:07'),
+(28, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:39:07'),
+(29, 'PC-71130950', NULL, 'Damaged', 'Lab A', 'System', 'systemUnit issue detected', '2025-09-14 11:39:08'),
+(30, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'headphone issue detected', '2025-09-14 11:39:08'),
+(31, 'PC-13782527', NULL, 'Damaged', 'Lab A', 'System', 'power issue detected', '2025-09-14 11:39:08');
 
 -- --------------------------------------------------------
 
@@ -197,7 +240,6 @@ INSERT INTO `users` (`lgid`, `name`, `email`, `role`, `year`, `password`) VALUES
 ('1', 'Natalie Jenh Alarcon', 'natnat@gmail.com', 'Lab Assistant', '4th Year', '123'),
 ('AD-1234', 'Admin ', 'admin@example.com', 'Admin', '0', 'adminpass'),
 ('AD-123456789', 'Admin', 'admin.ui@phinmaed.com', 'Admin', NULL, 'Admin1234'),
-('AD-2345', ' Admin', 'admin2@example.com', 'Admin', '0', 'admin2pass'),
 ('AS-0000', 'Lab Assistant', 'assistant2@example.com', ' Lab Assistant', '2', 'pass456'),
 ('LA-3001', 'Grace Kim', 'grace@example.com', 'Lab Adviser', NULL, 'grace303'),
 ('LA-5678', 'Lab Adviser', 'labadviser@example.com', 'Lab Adviser', '0', 'labpass');
@@ -205,12 +247,6 @@ INSERT INTO `users` (`lgid`, `name`, `email`, `role`, `year`, `password`) VALUES
 --
 -- Indexes for dumped tables
 --
-
---
--- Indexes for table `accessories_equipment`
---
-ALTER TABLE `accessories_equipment`
-  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `computer_equipments`
@@ -261,18 +297,6 @@ ALTER TABLE `users`
 --
 
 --
--- AUTO_INCREMENT for table `accessories_equipment`
---
-ALTER TABLE `accessories_equipment`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `computer_equipments`
---
-ALTER TABLE `computer_equipments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
 -- AUTO_INCREMENT for table `equipment`
 --
 ALTER TABLE `equipment`
@@ -288,7 +312,7 @@ ALTER TABLE `inventory`
 -- AUTO_INCREMENT for table `laboratory`
 --
 ALTER TABLE `laboratory`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `labs`
@@ -300,7 +324,7 @@ ALTER TABLE `labs`
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
 
 --
 -- Constraints for dumped tables

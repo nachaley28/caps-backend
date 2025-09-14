@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request,session
 from flask_cors import CORS, cross_origin
 from flask_mysqldb import MySQL
+import json,random
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -102,33 +104,28 @@ def get_data():
 
     cursor = mysql.connection.cursor()
 
-    # Users
     cursor.execute("SELECT * FROM users")
     users = cursor.fetchall()
     total_users = len(users)
     active_users = sum(1 for u in users if u[4] != "0" and u[4] is not None)
     inactive_users = total_users - active_users
 
-    # Labs
     cursor.execute("SELECT * FROM labs")
     labs = cursor.fetchall()
     total_labs = len(labs)
 
-    # Equipment
     cursor.execute("SELECT * FROM equipment")
     equipment = cursor.fetchall()
     total_equipments = len(equipment)
     equipments_operation = sum(1 for e in equipment if e[3] == "Operational")
     equipments_not_operation = total_equipments - equipments_operation
 
-    # Reports
     cursor.execute("SELECT * FROM reports")
     reports = cursor.fetchall()
     reports_submitted = len(reports)
     damaged = sum(1 for r in reports if "Damage" in r[4] or "Damaged" in r[4])
     missing = sum(1 for r in reports if "Missing" in r[4])
 
-    # Lab Equipment breakdown (per lab)
     lab_equipments = []
     for lab in labs:
         lab_id, lab_name = lab
@@ -142,7 +139,6 @@ def get_data():
             "missing": missing_count
         })
 
-    # Equipment Damage Stats (group by equipment type)
     equipment_damage_stats = []
     equipment_names = set(e[1] for e in equipment)
     for eq_name in equipment_names:
@@ -211,7 +207,6 @@ def login():
         cursor.close()
         session['user'] = user
         current_user = user
-        print("The current user is", current_user)
         if not user:
             return jsonify({"msg": "User not found"}), 404
 
@@ -226,7 +221,7 @@ def login():
                 "lgid": user_id,
                 "name": name,
                 "email": email,
-                "role": role,  # Matches frontend roles exactly
+                "role": role, 
                 "year": year
             }
         }), 200
@@ -256,25 +251,7 @@ def add_report():
 
     return {"report": "added succesfully"}
 
-@app.route('/get_reports', methods=['GET'])
-@cross_origin()
-def get_reports():
-    try:
-        cursor = mysql.connection.cursor()
-        cursor.execute("SELECT * FROM reports ORDER BY timestamp DESC")
-        rows = cursor.fetchall()
-        col_names = [desc[0] for desc in cursor.description]
-        cursor.close()
 
-        reports = [dict(zip(col_names, row)) for row in rows]
-        
-
-
-
-        return jsonify(reports), 200
-    except Exception as e:
-        print("Error fetching reports:", e)
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/dashboard_data', methods=['GET'])
 @cross_origin()
@@ -352,7 +329,6 @@ def get_inventory():
     email = request.headers.get("X-User-Email")
     role = request.headers.get("X-User-Id")
     final_data = []
-    # user = session.get('user')
     print(email,role)
     cursor = mysql.connection.cursor()
     cursor.execute("SELECT * FROM inventory")
@@ -384,7 +360,14 @@ def add_laboratory():
     cursor.execute("INSERT INTO laboratory (lab_name, location) VALUES (%s,%s)",(lab_name,location,))
     mysql.connection.commit()
 
-    return "success"
+    new_id = cursor.lastrowid
+
+
+    return {
+        "id": new_id,
+        "name": lab_name,
+        "location": location
+    }
 
 @app.route('/get_laboratory', methods=['GET'])
 def get_laboratory():
@@ -405,41 +388,159 @@ def get_laboratory():
 
     return final_data
 
-@app.route('/get_computer', methods=["GET"])
-def get_computer():
-    final_data = []
-    cursor = mysql.connection.cursor()
 
-    cursor.execute("SELECT * FROM computer_equipments")
-    data = cursor.fetchall()
+@app.route('/get_computers', methods=['GET'])
+def get_computers():
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT id, pc_name, lab_name, specs FROM computer_equipments")
+        rows = cur.fetchall()
+        cur.close()
 
-    for i in data:
-        computer = {
-            "id" : i[2],
-            "name" : i[3],
-            "spec" : i[0],
-            "lab" : i[1]
+        computers = []
+        for row in rows:
+            computers.append({
+                "id": row[0],
+                "pcNumber": row[1],
+                "lab": row[2],
+                "parts": json.loads(row[3]) if row[3] else {}
+            })
+
+        return jsonify(computers)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/get_computer_statuses')
+def get_computer_statuses():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM computer_status")
+    rows = cur.fetchall()
+    cur.close()
+
+    statuses = []
+    for row in rows:
+        statuses.append({
+            "com_id": row[0],
+            "hdmi": row[1],
+            "headphone": row[2],
+            "keyboard": row[3],
+            "monitor": row[4],
+            "mouse": row[5],
+            "power": row[6],
+            "systemUnit": row[7],
+            "wifi": row[8],
+            "status_id": row[9]
+        })
+
+    return jsonify(statuses)
+        
+    
+    
+
+@app.route('/update_computer_status', methods=['POST'])
+def update_status():
+    data = request.json
+    comp_id = data.get('compId')
+    part = data.get('part')
+    status = data.get('status')
+
+    cur = mysql.connection.cursor()
+    cur.execute(f"UPDATE computer_status SET {part} = %s WHERE com_id = %s ", (status, comp_id))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({"success": True})
+
+
+@app.route('/computer', methods=['POST'])
+def add_computer():
+    try:
+        data = request.json.get('data')
+        pc_name = data.get('name')
+        lab_name = data.get('lab_name')
+        spec = data.get('spec')
+        id = random.randint(11111111, 99999999)
+        cur = mysql.connection.cursor()
+        cur.execute(
+            "INSERT INTO computer_equipments (pc_name, lab_name, specs,id) VALUES (%s, %s, %s,%s)",
+            (pc_name, lab_name, spec,str(id))
+        )
+        mysql.connection.commit()
+        comp_id = cur.lastrowid
+        id_status = random.randint(11111111, 99999999)
+        cur.execute('INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)',(str(id),str(id_status)))
+        mysql.connection.commit()
+        
+        cur.close()
+
+        return jsonify({
+            "id": comp_id,
+            "pcNumber": pc_name,
+            "lab": lab_name,
+            "parts": json.loads(spec)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+
+@app.route('/get_admin_computer_reports')
+def get_admin_computer_reports():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM computer_status")
+    rows = cur.fetchall()
+
+    reports = []
+
+    for row in rows:
+        com_id = row[0]
+        hdmi = row[1]
+        headphone = row[2]
+        keyboard = row[3]
+        monitor = row[4]
+        mouse = row[5]
+        power = row[6]
+        systemUnit = row[7]
+        wifi = row[8]
+        status_id = row[9]
+
+        parts = {
+            "hdmi": hdmi,
+            "headphone": headphone,
+            "keyboard": keyboard,
+            "monitor": monitor,
+            "mouse": mouse,
+            "power": power,
+            "systemUnit": systemUnit,
+            "wifi": wifi,
         }
 
-        final_data.append(computer)
+        for part, status in parts.items():
+            if status != "operational":
+                report = {
+                    "id": status_id,                  
+                    "item": f"PC-{com_id}",               
+                    "lab": "Lab A",                     
+                    "status": status.capitalize(),        
+                    "date": datetime.now().isoformat(),    
+                    "notes": f"{part} issue detected",     
+                }
+                reports.append(report)
 
-    return final_data
+                # Insert into `reports` table
+                cur.execute("""
+                    INSERT INTO reports (com_id, lab, status, created_at, notes)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    report["item"],
+                    report["lab"],
+                    report["status"],
+                    report["date"],
+                    report["notes"]
+                ))
+                mysql.connection.commit()
 
-@app.route('/add_computer', methods=["POST"])
-def add_computer():
-    data = request.json.get('data')
+    cur.close()
+    return jsonify(reports)
     
-    name = data.get('name')
-    lab_name = data.get('lab_name')
-    spec = data.get('spec')
-    print(lab_name)
-    cursor = mysql.connection.cursor()
-
-    cursor.execute("INSERT INTO computer_equipments (specs,assign,name) VALUES (%s,%s,%s)",(spec,lab_name,name))
-    mysql.connection.commit()
-
-    return "success"
-
 
 @app.route('/get_accessories', methods=["GET"])
 def get_accessories():
@@ -468,7 +569,6 @@ def add_accessories():
     name = data.get('name')
     lab_name = data.get('lab_name')
     spec = data.get('spec')
-    print(lab_name)
     cursor = mysql.connection.cursor()
 
     cursor.execute("INSERT INTO accessories_equipment (spec,lab,name) VALUES (%s,%s,%s)",(spec,lab_name,name))
