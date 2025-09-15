@@ -76,122 +76,11 @@ def delete_lab(id):
     except Exception as e:
         return {"error": str(e)}, 500
         
-@app.route('/delete_inventory/<id>', methods=['DELETE'])
-def delete_inventory(id):
-    if id == "ALL":
-        try:
-            cursor = mysql.connection.cursor()
-            cursor.execute("DELETE FROM inventory")
-            mysql.connection.commit()
-            cursor.close()
-            return {"message": f"Deleted successfully"}, 200
-        except Exception as e:
-            return {"error": str(e)}, 500
-    else:
-        try:
-            cursor = mysql.connection.cursor()
-            cursor.execute("DELETE FROM inventory WHERE id = %s", (id,))
-            mysql.connection.commit()
-            cursor.close()
-            return {"message": f"Deleted successfully"}, 200
-        except Exception as e:
-            return {"error": str(e)}, 500
 
 
-@app.route('/get_data')
-@cross_origin()
-def get_data():
-
-    cursor = mysql.connection.cursor()
-
-    cursor.execute("SELECT * FROM users")
-    users = cursor.fetchall()
-    total_users = len(users)
-    active_users = sum(1 for u in users if u[4] != "0" and u[4] is not None)
-    inactive_users = total_users - active_users
-
-    cursor.execute("SELECT * FROM labs")
-    labs = cursor.fetchall()
-    total_labs = len(labs)
-
-    cursor.execute("SELECT * FROM equipment")
-    equipment = cursor.fetchall()
-    total_equipments = len(equipment)
-    equipments_operation = sum(1 for e in equipment if e[3] == "Operational")
-    equipments_not_operation = total_equipments - equipments_operation
-
-    cursor.execute("SELECT * FROM reports")
-    reports = cursor.fetchall()
-    reports_submitted = len(reports)
-    damaged = sum(1 for r in reports if "Damage" in r[4] or "Damaged" in r[4])
-    missing = sum(1 for r in reports if "Missing" in r[4])
-
-    lab_equipments = []
-    for lab in labs:
-        lab_id, lab_name = lab
-        total = sum(1 for e in equipment if e[2] == lab_id)
-        damaged_count = sum(1 for r in reports if r[1] == lab_name and ("Damage" in r[4] or "Damaged" in r[4]))
-        missing_count = sum(1 for r in reports if r[1] == lab_name and "Missing" in r[4])
-        lab_equipments.append({
-            "lab": lab_name,
-            "total": total,
-            "damaged": damaged_count,
-            "missing": missing_count
-        })
-
-    equipment_damage_stats = []
-    equipment_names = set(e[1] for e in equipment)
-    for eq_name in equipment_names:
-        damaged_count = sum(1 for r in reports if r[2] == eq_name and ("Damage" in r[4] or "Damaged" in r[4]))
-        missing_count = sum(1 for r in reports if r[2] == eq_name and "Missing" in r[4])
-        if damaged_count > 0 or missing_count > 0:
-            equipment_damage_stats.append({
-                "name": eq_name,
-                "damaged": damaged_count,
-                "missing": missing_count
-            })
-
-    cursor.close()
-
-    return {
-        "stats": {
-            "totalLabs": total_labs,
-            "totalEquipments": total_equipments,
-            "equipmentsOperation": equipments_operation,
-            "equipmentsNotOperation": equipments_not_operation,
-            "totalUsers": total_users,
-            "activeUsers": active_users,
-            "inactiveUsers": inactive_users,
-            "reportsSubmitted": reports_submitted,
-            "damaged": damaged,
-            "missing": missing,
-        },
-        "labEquipments": lab_equipments,
-        "equipmentDamageStats": equipment_damage_stats,
-    }
 
 
-@app.route('/signup', methods=['POST'])
-@cross_origin()
-def signup():
-    try:
-        data = request.json.get('data')
-        name = data.get('name')
-        email = data.get('email')
-        role = data.get('role')  
-        year = data.get('year')
-        password = data.get('password')
 
-        cursor = mysql.connection.cursor()
-        cursor.execute("INSERT INTO users (name, email, role, year, password) VALUES (%s,%s,%s,%s,%s)",
-                       (name, email, role, year, password))
-        mysql.connection.commit()
-        cursor.close()
-
-        return jsonify({"msg": "Signup successful"}), 201
-    except Exception as e:
-        print("Error in signup:", e)
-        return jsonify({"msg": str(e)}), 500
 
 @app.route('/login', methods=['POST'])
 @cross_origin()
@@ -253,100 +142,8 @@ def add_report():
 
 
 
-@app.route('/dashboard_data', methods=['GET'])
-@cross_origin()
-def dashboard_data():
-    cursor = mysql.connection.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM reports")
-    total_submitted = cursor.fetchone()[0]
-
-    cursor.execute("""
-        SELECT item, COUNT(*) as count 
-        FROM reports 
-        WHERE status = 'Damaged'
-        GROUP BY item
-    """)
-    damaged = [{"item": row[0], "count": row[1]} for row in cursor.fetchall()]
-
-    cursor.execute("""
-        SELECT item, COUNT(*) as count 
-        FROM reports 
-        WHERE status = 'Missing'
-        GROUP BY item
-    """)
-    missing = [{"item": row[0], "count": row[1]} for row in cursor.fetchall()]
-
-    cursor.execute("""
-        SELECT lab,
-               SUM(CASE WHEN status = 'Damaged' THEN 1 ELSE 0 END) as damaged,
-               SUM(CASE WHEN status = 'Missing' THEN 1 ELSE 0 END) as missing
-        FROM reports
-        GROUP BY lab
-    """)
-    lab_damage = [{"lab": row[0], "damaged": row[1], "missing": row[2]} for row in cursor.fetchall()]
-
-    cursor.execute("""
-        SELECT status, COUNT(*) 
-        FROM reports
-        GROUP BY status
-    """)
-    operational_stats = [{"label": row[0], "count": row[1]} for row in cursor.fetchall()]
-
-    cursor.execute("""
-        SELECT item, lab, COUNT(*) as count, status
-        FROM reports
-        GROUP BY item, lab, status
-    """)
-    icon_map = {
-        "Laptop": "laptop",
-        "Desktop": "desktop",
-        "Plug": "plug",
-        "Projector": "video"
-    }
-    inventory = [{
-        "title": row[0],
-        "icon": icon_map.get(row[0], "desktop"),
-        "count": row[2],
-        "location": row[1],
-        "status": row[3]
-    } for row in cursor.fetchall()]
-
-    cursor.close()
-
-    return jsonify({
-        "totalSubmitted": total_submitted,
-        "damaged": damaged,
-        "missing": missing,
-        "labDamage": lab_damage,
-        "inventory": inventory,
-        "operational_stats": operational_stats
-    })
-
-@app.route('/get_inventory', methods=["GET"])
-@cross_origin()
-def get_inventory():
-    email = request.headers.get("X-User-Email")
-    role = request.headers.get("X-User-Id")
-    final_data = []
-    print(email,role)
-    cursor = mysql.connection.cursor()
-    cursor.execute("SELECT * FROM inventory")
-    data = cursor.fetchall()
-    for  result in data:
-        item = {
-            
-            'id' : result[0],
-            'category' : result[1],
-            'name' : result[2],
-            'lab' : result[3],
-            'specs' : result[4],
-            'quantity' : result[5],
-            'status': result[6]
-        }
-        final_data.append(item)
     
-    return final_data
 
 @app.route('/add_laboratory', methods=['POST'])
 def add_laboratory():
@@ -491,16 +288,16 @@ def get_admin_computer_reports():
     reports = []
 
     for row in rows:
-        com_id = row[0]
-        hdmi = row[1]
-        headphone = row[2]
-        keyboard = row[3]
-        monitor = row[4]
-        mouse = row[5]
-        power = row[6]
-        systemUnit = row[7]
-        wifi = row[8]
-        status_id = row[9]
+        com_id      = row[0]
+        hdmi        = row[1]
+        headphone   = row[2]
+        keyboard    = row[3]
+        monitor     = row[4]
+        mouse       = row[5]
+        power       = row[6]
+        systemUnit  = row[7]
+        wifi        = row[8]
+        status_id   = row[9]
 
         parts = {
             "hdmi": hdmi,
@@ -512,28 +309,33 @@ def get_admin_computer_reports():
             "systemUnit": systemUnit,
             "wifi": wifi,
         }
-        
 
         for part, status in parts.items():
             if status != "operational":
-                cur.execute(f"SELECT lab_name FROM computer_equipments WHERE id = %s",(com_id,))
-                computer_equipments = cur.fetchone()[0]
+                # fetch both lab_name and pc_name
+                cur.execute(
+                    "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
+                    (com_id,)
+                )
+                lab_name, pc_name = cur.fetchone()   
+
                 report = {
-                    "id": status_id,                  
-                    "item": f"PC-{com_id}",               
-                    "lab": computer_equipments,                     
-                    "status": status.capitalize(),        
-                    "date": datetime.now().isoformat(),    
-                    "notes": f"{part} issue detected",     
+                    "id": status_id,
+                    "item": pc_name,                
+                    "lab": lab_name,
+                    "status": status.capitalize(),
+                    "date": datetime.now().isoformat(),
+                    "notes": f"{part} issue detected",
                 }
                 reports.append(report)
 
+                
                 cur.execute("""
                     INSERT INTO reports (com_id, lab, status, created_at, notes)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (
-                    report["item"],
-                    report["lab"],
+                    pc_name,             
+                    lab_name,
                     report["status"],
                     report["date"],
                     report["notes"]
@@ -542,7 +344,6 @@ def get_admin_computer_reports():
 
     cur.close()
     return jsonify(reports)
-    
 
 @app.route('/get_accessories', methods=["GET"])
 def get_accessories():
