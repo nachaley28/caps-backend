@@ -75,8 +75,194 @@ def delete_lab(id):
         return {"message": "Lab deleted"}, 200
     except Exception as e:
         return {"error": str(e)}, 500
-        
+    
+@app.route('/test_data')
+def test_data():
+    cursor = mysql.connection.cursor()
 
+    cursor.execute("SELECT * FROM users")
+    users = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM laboratory")
+    laboratory = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM computer_equipments")
+    computer_equipments = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM reports")
+    reports = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM computer_status")
+    computer_status = cursor.fetchall()
+
+    return {'users':users , 'laboratory':laboratory,'computer_equipments':computer_equipments,'reports':reports,'computer_status':computer_status}
+
+
+@app.route('/get_data')
+def get_data():
+    cursor = mysql.connection.cursor()
+
+    cursor.execute("SELECT * FROM users")
+    users = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM laboratory")
+    laboratories = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM computer_equipments")
+    computer_equipments = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM reports")
+    reports = cursor.fetchall()
+
+    cursor.execute("SELECT * FROM computer_status")
+    rows = cursor.fetchall()
+
+    reports_sub = []
+
+    for row in rows:
+        com_id      = row[0]
+        hdmi        = row[1]
+        headphone   = row[2]
+        keyboard    = row[3]
+        monitor     = row[4]
+        mouse       = row[5]
+        power       = row[6]
+        systemUnit  = row[7]
+        wifi        = row[8]
+        status_id   = row[9]
+
+        parts = {
+            "hdmi": hdmi,
+            "headphone": headphone,
+            "keyboard": keyboard,
+            "monitor": monitor,
+            "mouse": mouse,
+            "power": power,
+            "systemUnit": systemUnit,
+            "wifi": wifi,
+        }
+
+        for part, status in parts.items():
+            if status != "operational":
+                cursor.execute(
+                    "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
+                    (com_id,)
+                )
+                lab_name, pc_name = cursor.fetchone()   
+
+                report_sub = {
+                    "id": status_id,
+                    "item": pc_name,                
+                    "lab": lab_name,
+                    "status": status.capitalize(),
+                    "date": datetime.now().isoformat(),
+                    "notes": f"{part} issue detected",
+                }
+                reports_sub.append(report_sub)
+
+    cursor.execute("SELECT * FROM computer_status")
+    computer_status = cursor.fetchall()
+
+    total_users = len(users)
+    active_users = sum(1 for u in users if u[4] not in ("0", None))
+    inactive_users = total_users - active_users
+
+    total_labs = len(laboratories)
+    total_computers = len(computer_equipments)
+
+    operational = 0
+    not_operational = 0
+    damaged = 0
+    missing = 0
+    for status in computer_status:
+        for s in status[1:]:
+            val = str(s).lower()
+            if val == "operational":
+                operational += 1
+            elif val == "notoperational":
+                not_operational += 1
+            elif val == "damaged":
+                damaged += 1
+            elif val == "missing":
+                missing += 1
+
+    reports_submitted = len(reports_sub)
+
+    lab_equipments = []
+    for lab in laboratories:
+        lab_id, lab_name, lab_room = lab
+        total = sum(1 for comp in computer_equipments if comp[1] == lab_name)
+
+        damaged_count = 0
+        missing_count = 0
+        for comp in computer_equipments:
+            if comp[1] == lab_name:
+                comp_id = comp[3]
+                for status in computer_status:
+                    if status[0] == comp_id:
+                        vals = [str(x).lower() for x in status[1:]]
+                        damaged_count += vals.count("damaged")
+                        missing_count += vals.count("missing")
+
+        lab_equipments.append({
+            "lab": lab_name,
+            "total": total,
+            "damaged": damaged_count,
+            "missing": missing_count
+        })
+
+    equipment_damage_stats = []
+    for comp in computer_equipments:
+        comp_name = comp[1]
+        comp_id = comp[3]
+        damaged_count = 0
+        missing_count = 0
+        for status in computer_status:
+            if status[0] == comp_id:
+                vals = [str(x).lower() for x in status[1:]]
+                damaged_count += vals.count("damaged")
+                missing_count += vals.count("missing")
+        if damaged_count > 0 or missing_count > 0:
+            equipment_damage_stats.append({
+                "name": comp_name,
+                "damaged": damaged_count,
+                "missing": missing_count
+            })
+
+    user_report_count = {}
+    for r in reports:
+        reporter_id = r[1]
+        user_report_count[reporter_id] = user_report_count.get(reporter_id, 0) + 1
+
+    top_users = []
+    for u in users:
+        user_id = u[0]
+        name = u[1]
+        reports_sent = user_report_count.get(user_id, 0)
+        if reports_sent > 0:
+            top_users.append({"name": name, "reports": reports_sent})
+
+    top_users = sorted(top_users, key=lambda x: x["reports"], reverse=True)
+
+    cursor.close()
+
+    return {
+        "stats": {
+            "totalLabs": total_labs,
+            "totalComputers": total_computers,
+            "operational": operational,
+            "notOperational": not_operational,
+            "totalUsers": total_users,
+            "activeUsers": active_users,
+            "inactiveUsers": inactive_users,
+            "reportsSubmitted": reports_submitted,
+            "damaged": damaged,
+            "missing": missing,
+        },
+        "labEquipments": lab_equipments,
+        "equipmentDamageStats": equipment_damage_stats,
+        "topUsers": top_users,
+    }
 
 
 
@@ -237,16 +423,19 @@ def get_computer_statuses():
 @app.route('/update_computer_status', methods=['POST'])
 def update_status():
     data = request.json
-    comp_id = data.get('compId')
-    part = data.get('part')
-    status = data.get('status')
+    print(data)
+    comp_id = data.get("compId")
+    statuses = data.get("statuses", {})
 
-    cur = mysql.connection.cursor()
-    cur.execute(f"UPDATE computer_status SET {part} = %s WHERE com_id = %s ", (status, comp_id))
+    cursor = mysql.connection.cursor()
+
+    for part, status in statuses.items():
+        query = f"UPDATE computer_status SET {part} = %s WHERE com_id = %s"
+        cursor.execute(query, (status, comp_id))
+
     mysql.connection.commit()
-    cur.close()
+    cursor.close()
     return jsonify({"success": True})
-
 
 @app.route('/computer', methods=['POST'])
 def add_computer():
@@ -312,7 +501,6 @@ def get_admin_computer_reports():
 
         for part, status in parts.items():
             if status != "operational":
-                # fetch both lab_name and pc_name
                 cur.execute(
                     "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
                     (com_id,)
