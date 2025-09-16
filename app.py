@@ -75,28 +75,70 @@ def delete_lab(id):
         return {"message": "Lab deleted"}, 200
     except Exception as e:
         return {"error": str(e)}, 500
+        
+
+
+
+
+
+
+@app.route('/login', methods=['POST'])
+@cross_origin()
+def login():
+    try:
+        data = request.json.get('data')
+        email = data.get('email')
+        password = data.get('password')
+
+        cursor = mysql.connection.cursor()
+        cursor.execute("SELECT lgid, name, email, role, year, password FROM users WHERE email = %s", (email,))
+        user = cursor.fetchone()
+        cursor.close()
+        session['user'] = user
+        current_user = user
+        if not user:
+            return jsonify({"msg": "User not found"}), 404
+
+        user_id, name, email, role, year, stored_pw = user
+
+        if stored_pw != password:
+            return jsonify({"msg": "Invalid credentials"}), 401
+
+        return jsonify({
+            "msg": "Login successful",
+            "user": {
+                "lgid": user_id,
+                "name": name,
+                "email": email,
+                "role": role, 
+                "year": year
+            }
+        }), 200
+    except Exception as e:
+        print("Error in login:", e)
+        return jsonify({"msg": str(e)}), 500
+
+@app.route('/add_report', methods=['POST'])
+@cross_origin()
+def add_report():
     
-@app.route('/test_data')
-def test_data():
+    email = request.headers.get("X-User-Email")
+    report = request.json.get('data')
+    print(report)
+    lab = report['lab']
+    item = report['item']
+    label = report['label']
+    quantity = report['quantity']
+    status = report['status']
+    notes = report['notes']
+
     cursor = mysql.connection.cursor()
+    cursor.execute("INSERT INTO reports (lab,item,quantity,status,notes,submitted_by,label) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                   ( lab, item, quantity, status, notes, email,label))
+    mysql.connection.commit()
+    cursor.close()
 
-    cursor.execute("SELECT * FROM users")
-    users = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM laboratory")
-    laboratory = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM computer_equipments")
-    computer_equipments = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM reports")
-    reports = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM computer_status")
-    computer_status = cursor.fetchall()
-
-    return {'users':users , 'laboratory':laboratory,'computer_equipments':computer_equipments,'reports':reports,'computer_status':computer_status}
-
+    return {"report": "added succesfully"}
 
 @app.route('/get_data')
 def get_data():
@@ -118,7 +160,6 @@ def get_data():
     rows = cursor.fetchall()
 
     reports_sub = []
-
     for row in rows:
         com_id      = row[0]
         hdmi        = row[1]
@@ -141,7 +182,6 @@ def get_data():
             "systemUnit": systemUnit,
             "wifi": wifi,
         }
-
         for part, status in parts.items():
             if status != "operational":
                 cursor.execute(
@@ -229,20 +269,22 @@ def get_data():
                 "missing": missing_count
             })
 
-    user_report_count = {}
-    for r in reports:
-        reporter_id = r[1]
-        user_report_count[reporter_id] = user_report_count.get(reporter_id, 0) + 1
+    # 🔹 NEW: Build computer part status counts instead of top users
+    parts = ["wifi","headphone","keyboard","hdmi","monitor","mouse","power","systemUnit"]
+    computer_part_status = []
+    for part in parts:
+        operational_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "operational")
+        not_op_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "notoperational")
+        damaged_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "damaged")
+        missing_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "missing")
 
-    top_users = []
-    for u in users:
-        user_id = u[0]
-        name = u[1]
-        reports_sent = user_report_count.get(user_id, 0)
-        if reports_sent > 0:
-            top_users.append({"name": name, "reports": reports_sent})
-
-    top_users = sorted(top_users, key=lambda x: x["reports"], reverse=True)
+        computer_part_status.append({
+            "name": part,
+            "operational": operational_count,
+            "notOperational": not_op_count,
+            "damaged": damaged_count,
+            "missing": missing_count
+        })
 
     cursor.close()
 
@@ -261,71 +303,9 @@ def get_data():
         },
         "labEquipments": lab_equipments,
         "equipmentDamageStats": equipment_damage_stats,
-        "topUsers": top_users,
+        # replaced "topUsers" with "computerPartStatus"
+        "computerPartStatus": computer_part_status,
     }
-
-
-
-
-
-@app.route('/login', methods=['POST'])
-@cross_origin()
-def login():
-    try:
-        data = request.json.get('data')
-        email = data.get('email')
-        password = data.get('password')
-
-        cursor = mysql.connection.cursor()
-        cursor.execute("SELECT lgid, name, email, role, year, password FROM users WHERE email = %s", (email,))
-        user = cursor.fetchone()
-        cursor.close()
-        session['user'] = user
-        current_user = user
-        if not user:
-            return jsonify({"msg": "User not found"}), 404
-
-        user_id, name, email, role, year, stored_pw = user
-
-        if stored_pw != password:
-            return jsonify({"msg": "Invalid credentials"}), 401
-
-        return jsonify({
-            "msg": "Login successful",
-            "user": {
-                "lgid": user_id,
-                "name": name,
-                "email": email,
-                "role": role, 
-                "year": year
-            }
-        }), 200
-    except Exception as e:
-        print("Error in login:", e)
-        return jsonify({"msg": str(e)}), 500
-
-@app.route('/add_report', methods=['POST'])
-@cross_origin()
-def add_report():
-    
-    email = request.headers.get("X-User-Email")
-    report = request.json.get('data')
-    print(report)
-    lab = report['lab']
-    item = report['item']
-    label = report['label']
-    quantity = report['quantity']
-    status = report['status']
-    notes = report['notes']
-
-    cursor = mysql.connection.cursor()
-    cursor.execute("INSERT INTO reports (lab,item,quantity,status,notes,submitted_by,label) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                   ( lab, item, quantity, status, notes, email,label))
-    mysql.connection.commit()
-    cursor.close()
-
-    return {"report": "added succesfully"}
-
 
 
 
@@ -370,6 +350,7 @@ def get_laboratory():
         final_data.append(labs)
 
     return final_data
+
 
 
 @app.route('/get_computers', methods=['GET'])
@@ -437,6 +418,7 @@ def update_status():
     cursor.close()
     return jsonify({"success": True})
 
+
 @app.route('/computer', methods=['POST'])
 def add_computer():
     try:
@@ -501,6 +483,7 @@ def get_admin_computer_reports():
 
         for part, status in parts.items():
             if status != "operational":
+                # fetch both lab_name and pc_name
                 cur.execute(
                     "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
                     (com_id,)
