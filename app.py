@@ -230,7 +230,7 @@ def get_data():
 
     lab_equipments = []
     for lab in laboratories:
-        lab_id, lab_name, lab_room = lab
+        lab_name, lab_room = lab
         total = sum(1 for comp in computer_equipments if comp[1] == lab_name)
 
         damaged_count = 0
@@ -269,7 +269,6 @@ def get_data():
                 "missing": missing_count
             })
 
-    # 🔹 NEW: Build computer part status counts instead of top users
     parts = ["wifi","headphone","keyboard","hdmi","monitor","mouse","power","systemUnit"]
     computer_part_status = []
     for part in parts:
@@ -303,7 +302,6 @@ def get_data():
         },
         "labEquipments": lab_equipments,
         "equipmentDamageStats": equipment_damage_stats,
-        # replaced "topUsers" with "computerPartStatus"
         "computerPartStatus": computer_part_status,
     }
 
@@ -342,9 +340,9 @@ def get_laboratory():
 
     for i in data:
         labs = {
-            "id" : i[0],
-            "name" : i[1],
-            "location" : i[2]
+           
+            "name" : i[0],
+            "location" : i[1]
         }
 
         final_data.append(labs)
@@ -483,7 +481,6 @@ def get_admin_computer_reports():
 
         for part, status in parts.items():
             if status != "operational":
-                # fetch both lab_name and pc_name
                 cur.execute(
                     "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
                     (com_id,)
@@ -549,6 +546,26 @@ def add_accessories():
     mysql.connection.commit()
 
     return "success"
+
+@app.route("/labs-pc-count", methods=["GET"])
+def labs_pc_count():
+    try:
+        cur = mysql.connection.cursor()
+        cur.execute(
+            "SELECT lab_name, COUNT(pc_name) FROM computer_equipments GROUP BY lab_name"
+        )
+        rows = cur.fetchall()
+        cur.close()
+
+        lab_counts = [{"lab": lab, "count": count} for lab, count in rows]
+
+        return jsonify(lab_counts)
+
+    except Exception as e:
+        print("DB error:", e)
+        return jsonify({"error": str(e)}), 500
+
+
     
 if __name__ == '__main__':
     app.run(debug=True)
