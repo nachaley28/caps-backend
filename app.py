@@ -448,6 +448,10 @@ def add_computer():
         return jsonify({"error": str(e)}), 500
     
 
+
+      
+    
+
 @app.route('/get_admin_computer_reports')
 def get_admin_computer_reports():
     cur = mysql.connection.cursor()
@@ -455,18 +459,8 @@ def get_admin_computer_reports():
     rows = cur.fetchall()
 
     reports = []
-
     for row in rows:
-        com_id      = row[0]
-        hdmi        = row[1]
-        headphone   = row[2]
-        keyboard    = row[3]
-        monitor     = row[4]
-        mouse       = row[5]
-        power       = row[6]
-        systemUnit  = row[7]
-        wifi        = row[8]
-        status_id   = row[9]
+        com_id, hdmi, headphone, keyboard, monitor, mouse, power, systemUnit, wifi, status_id = row
 
         parts = {
             "hdmi": hdmi,
@@ -485,33 +479,37 @@ def get_admin_computer_reports():
                     "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
                     (com_id,)
                 )
-                lab_name, pc_name = cur.fetchone()   
+                result = cur.fetchone()
+                if not result:
+                    continue
+                lab_name, pc_name = result
 
+                report_date = datetime.now()
                 report = {
                     "id": status_id,
-                    "item": pc_name,                
+                    "item": pc_name,
                     "lab": lab_name,
                     "status": status.capitalize(),
-                    "date": datetime.now().isoformat(),
+                    "date": report_date.isoformat(),
                     "notes": f"{part} issue detected",
                 }
                 reports.append(report)
 
-                
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO reports (com_id, lab, status, created_at, notes)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (
-                    pc_name,             
-                    lab_name,
-                    report["status"],
-                    report["date"],
-                    report["notes"]
-                ))
-                mysql.connection.commit()
+                    """,
+                    (com_id, lab_name, report["status"], report_date, report["notes"])
+                )
 
+    mysql.connection.commit()
     cur.close()
     return jsonify(reports)
+
+
+
+
 
 @app.route('/get_accessories', methods=["GET"])
 def get_accessories():
