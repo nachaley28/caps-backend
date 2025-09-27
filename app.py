@@ -159,7 +159,9 @@ def get_data():
     cursor.execute("SELECT * FROM computer_status")
     rows = cursor.fetchall()
 
+
     reports_sub = []
+
     for row in rows:
         com_id      = row[0]
         hdmi        = row[1]
@@ -182,17 +184,24 @@ def get_data():
             "systemUnit": systemUnit,
             "wifi": wifi,
         }
+
         for part, status in parts.items():
             if status != "operational":
                 cursor.execute(
                     "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
                     (com_id,)
                 )
-                lab_name, pc_name = cursor.fetchone()   
+                row_data = cursor.fetchone()
+                if row_data is None:
+                    # Skip if no matching computer found
+                    print(f"No computer record found for id {com_id}")
+                    continue
+
+                lab_name, pc_name = row_data
 
                 report_sub = {
                     "id": status_id,
-                    "item": pc_name,                
+                    "item": pc_name,
                     "lab": lab_name,
                     "status": status.capitalize(),
                     "date": datetime.now().isoformat(),
@@ -200,33 +209,33 @@ def get_data():
                 }
                 reports_sub.append(report_sub)
 
-    cursor.execute("SELECT * FROM computer_status")
-    computer_status = cursor.fetchall()
+        cursor.execute("SELECT * FROM computer_status")
+        computer_status = cursor.fetchall()
 
-    total_users = len(users)
-    active_users = sum(1 for u in users if u[4] not in ("0", None))
-    inactive_users = total_users - active_users
+        total_users = len(users)
+        active_users = sum(1 for u in users if u[4] not in ("0", None))
+        inactive_users = total_users - active_users
 
-    total_labs = len(laboratories)
-    total_computers = len(computer_equipments)
+        total_labs = len(laboratories)
+        total_computers = len(computer_equipments)
 
-    operational = 0
-    not_operational = 0
-    damaged = 0
-    missing = 0
-    for status in computer_status:
-        for s in status[1:]:
-            val = str(s).lower()
-            if val == "operational":
-                operational += 1
-            elif val == "notoperational":
-                not_operational += 1
-            elif val == "damaged":
-                damaged += 1
-            elif val == "missing":
-                missing += 1
+        operational = 0
+        not_operational = 0
+        damaged = 0
+        missing = 0
+        for status in computer_status:
+            for s in status[1:]:
+                val = str(s).lower()
+                if val == "operational":
+                    operational += 1
+                elif val == "notoperational":
+                    not_operational += 1
+                elif val == "damaged":
+                    damaged += 1
+                elif val == "missing":
+                    missing += 1
 
-    reports_submitted = len(reports_sub)
+        reports_submitted = len(reports_sub)
 
     lab_equipments = []
     for lab in laboratories:
@@ -562,6 +571,8 @@ def labs_pc_count():
     except Exception as e:
         print("DB error:", e)
         return jsonify({"error": str(e)}), 500
+    
+
 
 
     
