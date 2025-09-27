@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request,session
 from flask_cors import CORS, cross_origin
 from flask_mysqldb import MySQL
-import json,random
+import json,random,csv,io
 from datetime import datetime
 
 app = Flask(__name__)
@@ -492,7 +492,23 @@ def get_admin_computer_reports():
                 if not result:
                     continue
                 lab_name, pc_name = result
-
+                notes = f"{part} issue detected"
+                cur.execute(
+                    "SELECT * FROM reports WHERE com_id = %s AND notes = %s",
+                    (com_id,notes,)
+                )
+                report_fetch = cur.fetchone()
+                if report_fetch:
+                    report = {
+                        "id": report_fetch[1],
+                        "item": pc_name,
+                        "lab": lab_name,
+                        "status": report_fetch[3],
+                        "date": report_fetch[7].isoformat(),
+                        "notes": report_fetch[6],
+                    }
+                    reports.append(report)
+                    continue
                 report_date = datetime.now()
                 report = {
                     "id": status_id,
@@ -502,7 +518,7 @@ def get_admin_computer_reports():
                     "date": report_date.isoformat(),
                     "notes": f"{part} issue detected",
                 }
-                reports.append(report)
+                
 
                 cur.execute(
                     """
@@ -514,6 +530,7 @@ def get_admin_computer_reports():
 
     mysql.connection.commit()
     cur.close()
+    reports.sort(key=lambda x: datetime.fromisoformat(x["date"]), reverse=True)
     return jsonify(reports)
 
 
@@ -572,9 +589,45 @@ def labs_pc_count():
         print("DB error:", e)
         return jsonify({"error": str(e)}), 500
     
+@app.route('/computer/bulk',methods=['POST'])
+def computer_bulk():
+    comp_id = ''
+    pc_name = ''
+    lab_name= ''
+    spec = None
+    data = request.json.get('data')
+    print(data)
+    for computer in data:
+        print(computer)
+        try:
+            pc_name = computer['pc_name']
+            print(pc_name)
+            lab_name = computer['lab_name']
+            spec = computer['specs']
+            id = random.randint(11111111, 99999999)
+            cur = mysql.connection.cursor()
+            cur.execute(
+                "INSERT INTO computer_equipments (pc_name, lab_name, specs,id) VALUES (%s, %s, %s,%s)",
+                (pc_name, lab_name, spec,str(id))
+            )
+            mysql.connection.commit()
+            comp_id = cur.lastrowid
+            id_status = random.randint(11111111, 99999999)
+            cur.execute('INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)',(str(id),str(id_status)))
+            mysql.connection.commit()
+            
+            cur.close()
 
-
-
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    return jsonify({
+        "id": comp_id,
+        "pcNumber": pc_name,
+        "lab": lab_name,
+        "parts": json.loads(spec)
+    })
     
 if __name__ == '__main__':
     app.run(debug=True)
