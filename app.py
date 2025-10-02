@@ -11,8 +11,10 @@ app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'labguard'
 app.config['SECRET_KEY'] = 'labguardsecretkey'
-CORS(app, origins="*")
+CORS(app, origins="*",supports_credentials=True)
 mysql = MySQL(app)
+
+current_user = None
 
 @app.route('/get_users')
 def get_users():
@@ -65,18 +67,29 @@ def delete_report(id):
         except Exception as e:
             return {"error": str(e)}, 500
         
-@app.route('/delete_lab/<int:id>', methods=['DELETE'])
-def delete_lab(id):
+@app.route('/delete_lab/<string:lab_name>', methods=['DELETE'])
+def delete_lab(lab_name):
     try:
         cursor = mysql.connection.cursor()
-        cursor.execute("DELETE FROM laboratory WHERE id = %s", (id,))
+        cursor.execute("DELETE FROM laboratory WHERE lab_name = %s", (lab_name,))
+        mysql.connection.commit()
+        cursor.execute("DELETE FROM computer_equipments WHERE lab_name = %s", (lab_name,))
         mysql.connection.commit()
         cursor.close()
         return {"message": "Lab deleted"}, 200
     except Exception as e:
         return {"error": str(e)}, 500
         
-
+@app.route('/delete_computer/<string:id>', methods=['DELETE'])
+def delete_computer(id):
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute("DELETE FROM computer_equipments WHERE id = %s", (id,))
+        mysql.connection.commit()
+        cursor.close()
+        return {"message": "Lab deleted"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 
 
@@ -85,6 +98,7 @@ def delete_lab(id):
 @app.route('/login', methods=['POST'])
 @cross_origin()
 def login():
+    global current_user
     try:
         data = request.json.get('data')
         email = data.get('email')
@@ -94,8 +108,7 @@ def login():
         cursor.execute("SELECT lgid, name, email, role, year, password FROM users WHERE email = %s", (email,))
         user = cursor.fetchone()
         cursor.close()
-        session['user'] = user
-        current_user = user
+        
         if not user:
             return jsonify({"msg": "User not found"}), 404
 
@@ -103,6 +116,14 @@ def login():
 
         if stored_pw != password:
             return jsonify({"msg": "Invalid credentials"}), 401
+        
+        current_user = {
+            "lgid": user_id,
+            "name": name,
+            "email": email,
+            "role": role,
+            "year": year
+        }
 
         return jsonify({
             "msg": "Login successful",
@@ -194,7 +215,7 @@ def get_data():
                 row_data = cursor.fetchone()
                 if row_data is None:
                     # Skip if no matching computer found
-                    print(f"No computer record found for id {com_id}")
+                    # print(f"No computer record found for id {com_id}")
                     continue
 
                 lab_name, pc_name = row_data
@@ -628,6 +649,20 @@ def computer_bulk():
         "lab": lab_name,
         "parts": json.loads(spec)
     })
+
+@app.route("/check_session")
+def check_session():
+    global current_user
+    if current_user:
+        return {"logged_in": True, "user": current_user}
+    return {"logged_in": False}
     
+@app.route("/logout")
+def logout():
+    global current_user
+    current_user = None
+    session.pop("user", None)
+    return {"message": "Logged out"}
+
 if __name__ == '__main__':
     app.run(debug=True)
