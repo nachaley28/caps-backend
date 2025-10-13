@@ -1,8 +1,13 @@
-from flask import Flask, jsonify, request,session
+from flask import Flask, jsonify, request,session,send_from_directory
 from flask_cors import CORS, cross_origin
 from flask_mysqldb import MySQL
 import json,random,csv,io
 from datetime import datetime
+from werkzeug.utils import secure_filename
+import os
+
+
+
 
 app = Flask(__name__)
 
@@ -16,24 +21,127 @@ mysql = MySQL(app)
 
 current_user = None
 
-@app.route('/get_users')
-def get_users():
-    users = []
-    cursor = mysql.connection.cursor()
-    cursor.execute("SELECT * FROM users")
-    data = cursor.fetchall()
-    for profile in data:
-        userProfile =    {
-                "lgid": profile[0],
-                "name": profile[1],
-                "email": profile[2],
-                "role": profile[3],
-                "year": profile[4],
-                "password": profile[5]
-            }
-        users.append(userProfile)
 
-    return users
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@app.route("/upload_profile_image", methods=["POST"])
+@cross_origin(supports_credentials=True)
+def upload_profile_image():
+    global current_user
+    if not current_user:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    if "image" not in request.files:
+        return jsonify({"success": False, "message": "No file uploaded"}), 400
+
+    file = request.files["image"]
+    if file.filename == "":
+        return jsonify({"success": False, "message": "No file selected"}), 400
+
+ 
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+
+    cursor = mysql.connection.cursor()
+    cursor.execute(
+        "UPDATE users SET profile=%s WHERE lgid=%s",
+        (filename, current_user['lgid'])
+    )
+    mysql.connection.commit()
+    cursor.close()
+
+    return jsonify({"success": True, "image_url": f"http://127.0.0.1:5000/uploads/{filename}"})
+
+
+@app.route("/update_profile", methods=["POST"])
+@cross_origin(supports_credentials=True)
+def update_profile():
+    global current_user
+    if not current_user:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    data = request.get_json()
+    name = data.get("name")
+    email = data.get("email")
+    department = data.get("department")
+    position = data.get("position")
+    new_password = data.get("newPassword")
+    current_password = data.get("currentPassword")
+    image_filename = data.get("image")  
+
+    if image_filename and "/" in image_filename:
+        image_filename = image_filename.split("/")[-1]
+
+    cursor = mysql.connection.cursor()
+
+    if new_password:
+        cursor.execute("SELECT password FROM users WHERE lgid=%s", (current_user['lgid'],))
+        stored_pw = cursor.fetchone()[0]
+        if stored_pw != current_password:
+            cursor.close()
+            return jsonify({"success": False, "message": "Current password is incorrect"}), 401
+
+        cursor.execute(
+            "UPDATE users SET password=%s WHERE lgid=%s",
+            (new_password, current_user['lgid'])
+        )
+
+    cursor.execute(
+        "UPDATE users SET name=%s, email=%s, department=%s, position=%s, profile=%s WHERE lgid=%s",
+        (name, email, department, position, image_filename, current_user['lgid'])
+    )
+    mysql.connection.commit()
+    cursor.close()
+
+    return jsonify({"success": True, "message": "Profile updated successfully"})
+
+
+@app.route("/get_user")
+@cross_origin(supports_credentials=True)
+def get_user():
+    global current_user
+    if not current_user:
+        return jsonify({"error": "Not logged in"}), 401
+
+    cursor = mysql.connection.cursor()
+    cursor.execute(
+        "SELECT lgid, name, email, role, year, password, profile, department, position "
+        "FROM users WHERE lgid=%s",
+        (current_user['lgid'],)
+    )
+    profile = cursor.fetchone()
+    cursor.close()
+
+    if profile:
+        filename = profile[6]  
+        if filename:
+            image_url = f"http://127.0.0.1:5000/uploads/{filename}"
+        else:
+            image_url = "/img/default.png"
+
+        userProfile = {
+            "lgid": profile[0],
+            "name": profile[1],
+            "email": profile[2],
+            "role": profile[3],
+            "year": profile[4],
+            "password": profile[5],
+            "image": image_url,
+            "department": profile[7],
+            "position": profile[8],
+        }
+        return jsonify(userProfile)
+
+    return jsonify({"error": "User not found"}), 404
+
+
 
 @app.route('/delete_user/<email>', methods=['DELETE'])
 def delete_user(email):
@@ -91,9 +199,26 @@ def delete_computer(id):
     except Exception as e:
         return {"error": str(e)}, 500
 
+@app.route("/edit_lab/<lab_name>", methods=["PUT"])
+def edit_lab(lab_name):
+    try:
+        data = request.get_json()
+        new_lab_name = data.get("lab_name")
+        location = data.get("location")
 
+        cursor = mysql.connection.cursor()
+        cursor.execute(
+            "UPDATE laboratory SET lab_name=%s, location=%s WHERE lab_name=%s",
+            (new_lab_name, location, lab_name)
+        )
+        mysql.connection.commit()
+        cursor.close()
 
+        return jsonify({"success": True, "message": "Lab updated successfully"}), 200
 
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"success": False, "message": str(e)}), 400
 
 @app.route('/login', methods=['POST'])
 @cross_origin()
@@ -214,8 +339,6 @@ def get_data():
                 )
                 row_data = cursor.fetchone()
                 if row_data is None:
-                    # Skip if no matching computer found
-                    # print(f"No computer record found for id {com_id}")
                     continue
 
                 lab_name, pc_name = row_data
@@ -232,6 +355,7 @@ def get_data():
 
         cursor.execute("SELECT * FROM computer_status")
         computer_status = cursor.fetchall()
+        
 
         total_users = len(users)
         active_users = sum(1 for u in users if u[4] not in ("0", None))
@@ -301,6 +425,7 @@ def get_data():
 
     parts = ["wifi","headphone","keyboard","hdmi","monitor","mouse","power","systemUnit"]
     computer_part_status = []
+
     for part in parts:
         operational_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "operational")
         not_op_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "notoperational")
@@ -454,30 +579,75 @@ def add_computer():
         pc_name = data.get('name')
         lab_name = data.get('lab_name')
         spec = data.get('spec')
-        id = random.randint(11111111, 99999999)
+
+        random_id = str(random.randint(11111111, 99999999))
+        status_id = str(random.randint(11111111, 99999999))
+
         cur = mysql.connection.cursor()
+
         cur.execute(
-            "INSERT INTO computer_equipments (pc_name, lab_name, specs,id) VALUES (%s, %s, %s,%s)",
-            (pc_name, lab_name, spec,str(id))
+            "INSERT INTO computer_equipments (pc_name, lab_name, specs, id) VALUES (%s, %s, %s, %s)",
+            (pc_name, lab_name, spec, random_id)
         )
         mysql.connection.commit()
-        comp_id = cur.lastrowid
-        id_status = random.randint(11111111, 99999999)
-        cur.execute('INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)',(str(id),str(id_status)))
+
+        cur.execute(
+            "INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)",
+            (random_id, status_id)
+        )
         mysql.connection.commit()
-        
+
         cur.close()
 
         return jsonify({
-            "id": comp_id,
+            "id": random_id,
             "pcNumber": pc_name,
             "lab": lab_name,
             "parts": json.loads(spec)
         })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
+@app.route('/computer/bulk',methods=['POST'])
+def computer_bulk():
+    comp_id = ''
+    pc_name = ''
+    lab_name= ''
+    spec = None
+    data = request.json.get('data')
+    print(data)
+    for computer in data:
+        print(computer)
+        try:
+            pc_name = computer['pc_name']
+            print(pc_name)
+            lab_name = computer['lab_name']
+            spec = computer['specs']
+            id = random.randint(11111111, 99999999)
+            cur = mysql.connection.cursor()
+            cur.execute(
+                "INSERT INTO computer_equipments (pc_name, lab_name, specs,id) VALUES (%s, %s, %s,%s)",
+                (pc_name, lab_name, spec,str(id))
+            )
+            mysql.connection.commit()
+            comp_id = cur.lastrowid
+            id_status = random.randint(11111111, 99999999)
+            cur.execute('INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)',(str(id),str(id_status)))
+            mysql.connection.commit()
+            
+            cur.close()
 
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    
+    return jsonify({
+        "id": comp_id,
+        "pcNumber": pc_name,
+        "lab": lab_name,
+        "parts": json.loads(spec)
+    })
 
       
     
@@ -610,45 +780,7 @@ def labs_pc_count():
         print("DB error:", e)
         return jsonify({"error": str(e)}), 500
     
-@app.route('/computer/bulk',methods=['POST'])
-def computer_bulk():
-    comp_id = ''
-    pc_name = ''
-    lab_name= ''
-    spec = None
-    data = request.json.get('data')
-    print(data)
-    for computer in data:
-        print(computer)
-        try:
-            pc_name = computer['pc_name']
-            print(pc_name)
-            lab_name = computer['lab_name']
-            spec = computer['specs']
-            id = random.randint(11111111, 99999999)
-            cur = mysql.connection.cursor()
-            cur.execute(
-                "INSERT INTO computer_equipments (pc_name, lab_name, specs,id) VALUES (%s, %s, %s,%s)",
-                (pc_name, lab_name, spec,str(id))
-            )
-            mysql.connection.commit()
-            comp_id = cur.lastrowid
-            id_status = random.randint(11111111, 99999999)
-            cur.execute('INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)',(str(id),str(id_status)))
-            mysql.connection.commit()
-            
-            cur.close()
 
-            
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-    
-    return jsonify({
-        "id": comp_id,
-        "pcNumber": pc_name,
-        "lab": lab_name,
-        "parts": json.loads(spec)
-    })
 
 @app.route("/check_session")
 def check_session():
