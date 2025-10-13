@@ -199,17 +199,23 @@ def delete_computer(id):
     except Exception as e:
         return {"error": str(e)}, 500
 
-@app.route("/edit_lab/<lab_name>", methods=["PUT"])
-def edit_lab(lab_name):
+@app.route("/edit_lab/<lab_id>", methods=["PUT"])
+def edit_lab(lab_id):
     try:
         data = request.get_json()
+        print(data)
         new_lab_name = data.get("lab_name")
         location = data.get("location")
 
         cursor = mysql.connection.cursor()
         cursor.execute(
-            "UPDATE laboratory SET lab_name=%s, location=%s WHERE lab_name=%s",
-            (new_lab_name, location, lab_name)
+            "UPDATE laboratory SET lab_name=%s, location=%s WHERE lab_id=%s",
+            (new_lab_name, location, lab_id)
+        )
+        mysql.connection.commit()
+        cursor.execute(
+            "UPDATE computer_equipments SET lab_name=%s WHERE lab_id=%s",
+            (new_lab_name, lab_id)
         )
         mysql.connection.commit()
         cursor.close()
@@ -384,7 +390,7 @@ def get_data():
 
     lab_equipments = []
     for lab in laboratories:
-        lab_name, lab_room = lab
+        lab_name, lab_room,_ = lab
         total = sum(1 for comp in computer_equipments if comp[1] == lab_name)
 
         damaged_count = 0
@@ -495,9 +501,9 @@ def get_laboratory():
 
     for i in data:
         labs = {
-           
-            "name" : i[0],
-            "location" : i[1]
+            "lab_id": i[0],
+            "name" : i[1],
+            "location" : i[2]
         }
 
         final_data.append(labs)
@@ -522,6 +528,8 @@ def get_computers():
                 "lab": row[2],
                 "parts": json.loads(row[3]) if row[3] else {}
             })
+
+        print(computers)
 
         return jsonify(computers)
     except Exception as e:
@@ -576,6 +584,7 @@ def update_status():
 def add_computer():
     try:
         data = request.json.get('data')
+        lab_id = data.get('id')
         pc_name = data.get('name')
         lab_name = data.get('lab_name')
         spec = data.get('spec')
@@ -586,9 +595,10 @@ def add_computer():
         cur = mysql.connection.cursor()
 
         cur.execute(
-            "INSERT INTO computer_equipments (pc_name, lab_name, specs, id) VALUES (%s, %s, %s, %s)",
-            (pc_name, lab_name, spec, random_id)
+            "INSERT INTO computer_equipments (pc_name, lab_name, specs, id,lab_id) VALUES (%s, %s, %s, %s,%s)",
+            (pc_name, lab_name, spec, random_id,lab_id)
         )
+        
         mysql.connection.commit()
 
         cur.execute(
@@ -607,6 +617,7 @@ def add_computer():
         })
 
     except Exception as e:
+        print(e)
         return jsonify({"error": str(e)}), 500
     
 @app.route('/computer/bulk',methods=['POST'])
@@ -767,12 +778,13 @@ def labs_pc_count():
     try:
         cur = mysql.connection.cursor()
         cur.execute(
-            "SELECT lab_name, COUNT(pc_name) FROM computer_equipments GROUP BY lab_name"
+            "SELECT lab_id, COUNT(pc_name) FROM computer_equipments GROUP BY lab_id"
         )
         rows = cur.fetchall()
         cur.close()
-
+        print(rows)
         lab_counts = [{"lab": lab, "count": count} for lab, count in rows]
+        print(lab_counts)
 
         return jsonify(lab_counts)
 
