@@ -292,179 +292,6 @@ def add_report():
 
     return {"report": "added succesfully"}
 
-@app.route('/get_data')
-def get_data():
-    cursor = mysql.connection.cursor()
-
-    cursor.execute("SELECT * FROM users")
-    users = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM laboratory")
-    laboratories = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM computer_equipments")
-    computer_equipments = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM reports")
-    reports = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM computer_status")
-    rows = cursor.fetchall()
-
-
-    reports_sub = []
-
-    for row in rows:
-        com_id      = row[0]
-        hdmi        = row[1]
-        headphone   = row[2]
-        keyboard    = row[3]
-        monitor     = row[4]
-        mouse       = row[5]
-        power       = row[6]
-        systemUnit  = row[7]
-        wifi        = row[8]
-        status_id   = row[9]
-
-        parts = {
-            "hdmi": hdmi,
-            "headphone": headphone,
-            "keyboard": keyboard,
-            "monitor": monitor,
-            "mouse": mouse,
-            "power": power,
-            "systemUnit": systemUnit,
-            "wifi": wifi,
-        }
-
-        for part, status in parts.items():
-            if status != "operational":
-                cursor.execute(
-                    "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
-                    (com_id,)
-                )
-                row_data = cursor.fetchone()
-                if row_data is None:
-                    continue
-
-                lab_name, pc_name = row_data
-
-                report_sub = {
-                    "id": status_id,
-                    "item": pc_name,
-                    "lab": lab_name,
-                    "status": status.capitalize(),
-                    "date": datetime.now().isoformat(),
-                    "notes": f"{part} issue detected",
-                }
-                reports_sub.append(report_sub)
-
-        cursor.execute("SELECT * FROM computer_status")
-        computer_status = cursor.fetchall()
-        
-
-        total_users = len(users)
-        active_users = sum(1 for u in users if u[4] not in ("0", None))
-        inactive_users = total_users - active_users
-
-        total_labs = len(laboratories)
-        total_computers = len(computer_equipments)
-
-        operational = 0
-        not_operational = 0
-        damaged = 0
-        missing = 0
-        for status in computer_status:
-            for s in status[1:]:
-                val = str(s).lower()
-                if val == "operational":
-                    operational += 1
-                elif val == "notoperational":
-                    not_operational += 1
-                elif val == "damaged":
-                    damaged += 1
-                elif val == "missing":
-                    missing += 1
-
-        reports_submitted = len(reports_sub)
-
-    lab_equipments = []
-    for lab in laboratories:
-        lab_name, lab_room,_ = lab
-        total = sum(1 for comp in computer_equipments if comp[1] == lab_name)
-
-        damaged_count = 0
-        missing_count = 0
-        for comp in computer_equipments:
-            if comp[1] == lab_name:
-                comp_id = comp[3]
-                for status in computer_status:
-                    if status[0] == comp_id:
-                        vals = [str(x).lower() for x in status[1:]]
-                        damaged_count += vals.count("damaged")
-                        missing_count += vals.count("missing")
-
-        lab_equipments.append({
-            "lab": lab_name,
-            "total": total,
-            "damaged": damaged_count,
-            "missing": missing_count
-        })
-
-    equipment_damage_stats = []
-    for comp in computer_equipments:
-        comp_name = comp[1]
-        comp_id = comp[3]
-        damaged_count = 0
-        missing_count = 0
-        for status in computer_status:
-            if status[0] == comp_id:
-                vals = [str(x).lower() for x in status[1:]]
-                damaged_count += vals.count("damaged")
-                missing_count += vals.count("missing")
-        if damaged_count > 0 or missing_count > 0:
-            equipment_damage_stats.append({
-                "name": comp_name,
-                "damaged": damaged_count,
-                "missing": missing_count
-            })
-
-    parts = ["wifi","headphone","keyboard","hdmi","monitor","mouse","power","systemUnit"]
-    computer_part_status = []
-
-    for part in parts:
-        operational_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "operational")
-        not_op_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "notoperational")
-        damaged_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "damaged")
-        missing_count = sum(1 for row in computer_status if str(row[parts.index(part)+1]).lower() == "missing")
-
-        computer_part_status.append({
-            "name": part,
-            "operational": operational_count,
-            "notOperational": not_op_count,
-            "damaged": damaged_count,
-            "missing": missing_count
-        })
-
-    cursor.close()
-
-    return {
-        "stats": {
-            "totalLabs": total_labs,
-            "totalComputers": total_computers,
-            "operational": operational,
-            "notOperational": not_operational,
-            "totalUsers": total_users,
-            "activeUsers": active_users,
-            "inactiveUsers": inactive_users,
-            "reportsSubmitted": reports_submitted,
-            "damaged": damaged,
-            "missing": missing,
-        },
-        "labEquipments": lab_equipments,
-        "equipmentDamageStats": equipment_damage_stats,
-        "computerPartStatus": computer_part_status,
-    }
 
 
 
@@ -490,6 +317,120 @@ def add_laboratory():
         "name": lab_name,
         "location": location
     }
+@app.route('/get_data')
+def get_data():
+    cursor = mysql.connection.cursor()
+
+    # --- Fetch tables ---
+    cursor.execute("SELECT * FROM users")
+    users = cursor.fetchall()  # user_id, name, ..., has_voted
+
+    cursor.execute("SELECT * FROM laboratory")
+    laboratories = cursor.fetchall()  # lab_id, lab_name, location
+
+    cursor.execute("SELECT * FROM computer_equipments")
+    computer_equipments = cursor.fetchall()  # id, lab_name, pc_name
+
+    cursor.execute("SELECT * FROM computer_status")
+    computer_status = cursor.fetchall()  # com_id, hdmi, headphone, keyboard, monitor, mouse, power, systemUnit, wifi, status_id
+
+    cursor.execute("SELECT * FROM reports")
+    reports = cursor.fetchall()  # id, user_id, com_id, date, notes
+
+    # --- Summary stats ---
+    total_users = len(users)
+    active_users = sum(1 for u in users if u[4] not in ("0", None))  # adjust index for has_voted
+    inactive_users = total_users - active_users
+
+    total_labs = len(laboratories)
+    total_computers = len(computer_equipments)
+
+    # Overall operational stats
+    operational = not_operational = damaged = missing = 0
+    for status in computer_status:
+        for s in status[1:9]:  # exclude com_id and status_id
+            val = str(s).lower()
+            if val == "operational":
+                operational += 1
+            elif val == "notoperational":
+                not_operational += 1
+            elif val == "damaged":
+                damaged += 1
+            elif val == "missing":
+                missing += 1
+
+    reports_submitted = len(reports)
+
+    # --- Computer parts status ---
+    parts = ["wifi","headphone","keyboard","hdmi","monitor","mouse","power","systemUnit"]
+    computerPartStatus = []
+    for i, part in enumerate(parts):
+        operational_count = sum(1 for row in computer_status if str(row[i+1]).lower() == "operational")
+        not_op_count = sum(1 for row in computer_status if str(row[i+1]).lower() == "notoperational")
+        damaged_count = sum(1 for row in computer_status if str(row[i+1]).lower() == "damaged")
+        missing_count = sum(1 for row in computer_status if str(row[i+1]).lower() == "missing")
+        computerPartStatus.append({
+            "name": part,
+            "operational": operational_count,
+            "notOperational": not_op_count,
+            "damaged": damaged_count,
+            "missing": missing_count
+        })
+
+    # --- Labs & Computers and Damage vs Missing ---
+    labEquipments = []
+    damageMissing = []
+
+    for lab in laboratories:
+        lab_id, lab_name, location = lab
+        total = sum(1 for comp in computer_equipments if comp[1] == lab_name)
+
+        damaged_count = 0
+        missing_count = 0
+        for comp in computer_equipments:
+            if comp[1] == lab_name:
+                comp_id = comp[0]
+                for status in computer_status:
+                    if status[0] == comp_id:
+                        vals = [str(x).lower() for x in status[1:9]]
+                        damaged_count += vals.count("damaged")
+                        missing_count += vals.count("missing")
+
+        # Use "name" as key to match React
+        labEquipments.append({
+            "name": lab_name,
+            "computers": total
+        })
+
+        damageMissing.append({
+            "name": lab_name,
+            "damaged": damaged_count,
+            "missing": missing_count
+        })
+
+    cursor.close()
+
+    # --- Print debug info ---
+    print("labEquipments:", labEquipments)
+    print("damageMissing:", damageMissing)
+
+    return jsonify({
+        "stats": {
+            "totalLabs": total_labs,
+            "totalComputers": total_computers,
+            "operational": operational,
+            "notOperational": not_operational,
+            "totalUsers": total_users,
+            "activeUsers": active_users,
+            "inactiveUsers": inactive_users,
+            "reportsSubmitted": reports_submitted,
+            "damaged": damaged,
+            "missing": missing,
+        },
+        "computerPartStatus": computerPartStatus,
+        "labEquipments": labEquipments,
+        "damageMissing": damageMissing
+    })
 
 @app.route('/get_laboratory', methods=['GET'])
 def get_laboratory():
@@ -778,18 +719,15 @@ def labs_pc_count():
     try:
         cur = mysql.connection.cursor()
         cur.execute(
-            "SELECT lab_id, COUNT(pc_name) FROM computer_equipments GROUP BY lab_id"
+            "SELECT lab_name, COUNT(pc_name) FROM computer_equipments GROUP BY lab_name"
         )
         rows = cur.fetchall()
         cur.close()
-        print(rows)
-        lab_counts = [{"lab": lab, "count": count} for lab, count in rows]
+        lab_counts = [{"lab_name": lab, "count": count} for lab, count in rows]
         print(lab_counts)
-
         return jsonify(lab_counts)
-
+        
     except Exception as e:
-        print("DB error:", e)
         return jsonify({"error": str(e)}), 500
     
 
