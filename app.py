@@ -5,13 +5,14 @@ import json,random,csv,io
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
+from emailer import send_templated_email
 
 
 
 
 app = Flask(__name__)
 
-app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_HOST'] = '127.0.0.1'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'labguard'
@@ -729,13 +730,38 @@ def labs_pc_count():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+
+@app.route('/send_report_email',methods= ['POST'])
+def send_report_email():
+    title = request.json.get('title')
+    summary = request.json.get('summary')
+    position = request.json.get('position')
+    userEmail = request.json.get('userEmail')
+    context = {
+        "title":title,
+        "summary":summary,
+        'recipient': ["justindelavega00@gmail.com","juag.delavega.ui@phinmaed.com"],
+        "position":position,
+        "userEmail": userEmail
+    }
+
+    send_templated_email(
+        sender_email='claims.pui@gmail.com',
+        sender_password='vxdk puti kyhc mdkr',
+        receiver_email=context['recipient'],
+        subject=f"System Report - {context['title']}",
+        template_name='report.html',
+        context=context
+    )
+    return {"message": "Email send succesfully"}
 
 
 @app.route("/check_session")
 def check_session():
     global current_user
     if current_user:
+        print("Current user:",current_user)
         return {"logged_in": True, "user": current_user}
     return {"logged_in": False}
     
