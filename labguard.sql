@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 13, 2025 at 05:26 PM
+-- Generation Time: Oct 22, 2025 at 12:44 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -40,9 +40,7 @@ CREATE TABLE `computer_equipments` (
 --
 
 INSERT INTO `computer_equipments` (`pc_name`, `lab_name`, `specs`, `id`, `lab_id`) VALUES
-('1', '90', '{\"monitor\":\"1\",\"systemUnit\":\"1\",\"keyboard\":\"1\",\"mouse\":\"1\",\"headphone\":\"1\",\"hdmi\":\"1\",\"power\":\"1\",\"wifi\":\"1\"}', '66162603', 3),
-('4', '10', '{\"monitor\":\"4\",\"systemUnit\":\"4\",\"keyboard\":\"4\",\"mouse\":\"4\",\"headphone\":\"4\",\"hdmi\":\"4\",\"power\":\"4\",\"wifi\":\"4\"}', '89523799', 4),
-('2', '10', '{\"monitor\":\"2\",\"systemUnit\":\"2\",\"keyboard\":\"2\",\"mouse\":\"2\",\"headphone\":\"2\",\"hdmi\":\"2\",\"power\":\"2\",\"wifi\":\"2\"}', '65351747', 4);
+('1', '1', '{\"monitor\":\"1\",\"systemUnit\":\"1\",\"keyboard\":\"1\",\"mouse\":\"1\",\"headphone\":\"1\",\"hdmi\":\"1\",\"power\":\"1\",\"wifi\":\"1\"}', '47583517', 5);
 
 -- --------------------------------------------------------
 
@@ -68,9 +66,7 @@ CREATE TABLE `computer_status` (
 --
 
 INSERT INTO `computer_status` (`com_id`, `hdmi`, `headphone`, `keyboard`, `monitor`, `mouse`, `power`, `systemUnit`, `wifi`, `status_id`) VALUES
-('66162603', 'operational', 'operational', 'operational', 'missing', 'operational', 'operational', 'operational', 'operational', 38181049),
-('89523799', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 17587907),
-('65351747', 'operational', 'operational', 'damaged', 'operational', 'operational', 'operational', 'operational', 'operational', 82702591);
+('47583517', 'notOperational', 'damaged', 'missing', 'operational', 'operational', 'operational', 'operational', 'operational', 76215134);
 
 -- --------------------------------------------------------
 
@@ -89,8 +85,7 @@ CREATE TABLE `laboratory` (
 --
 
 INSERT INTO `laboratory` (`lab_id`, `lab_name`, `location`) VALUES
-(3, '90', '4'),
-(4, '10', '4');
+(5, '1', 'EL Building, 2nd Floor');
 
 -- --------------------------------------------------------
 
@@ -114,16 +109,9 @@ CREATE TABLE `reports` (
 --
 
 INSERT INTO `reports` (`id`, `com_id`, `part`, `status`, `lab`, `submitted_by`, `notes`, `created_at`) VALUES
-(20, '50342044', NULL, 'Notoperational', '1', 'System', 'hdmi issue detected', '2025-10-11 04:33:09'),
-(21, '50342044', NULL, 'Damaged', '1', 'System', 'headphone issue detected', '2025-10-12 02:02:54'),
-(22, '50342044', NULL, 'Notoperational', '1', 'System', 'keyboard issue detected', '2025-10-12 02:03:37'),
-(23, '47500017', NULL, 'Notoperational', '2', 'System', 'hdmi issue detected', '2025-10-12 09:27:30'),
-(24, '44872654', NULL, 'Notoperational', '1', 'System', 'hdmi issue detected', '2025-10-12 09:29:13'),
-(25, '44872654', NULL, 'Notoperational', '1', 'System', 'headphone issue detected', '2025-10-12 10:13:59'),
-(26, '78223936', NULL, 'Damaged', '1', 'System', 'hdmi issue detected', '2025-10-12 10:20:39'),
-(27, '65351747', NULL, 'Damaged', '10', 'System', 'keyboard issue detected', '2025-10-13 15:23:19'),
-(28, '89523799', NULL, 'Notoperational', '10', 'System', 'power issue detected', '2025-10-13 15:23:43'),
-(29, '66162603', NULL, 'Notoperational', '90', 'System', 'monitor issue detected', '2025-10-13 15:24:08');
+(30, '47583517', NULL, 'Notoperational', '1', 'System', 'hdmi issue detected', '2025-10-22 03:50:02'),
+(31, '47583517', NULL, 'Damaged', '1', 'System', 'headphone issue detected', '2025-10-22 03:50:02'),
+(32, '47583517', NULL, 'Missing', '1', 'System', 'keyboard issue detected', '2025-10-22 03:50:02');
 
 -- --------------------------------------------------------
 
@@ -148,8 +136,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`lgid`, `name`, `email`, `role`, `year`, `password`, `profile`, `department`, `position`) VALUES
-('AD-123456', 'Ryan Valeriano', 'rcvaleriano.ui@phinmaed.com', 'Admin', NULL, '123456789', 'ryan.jpg', 'CITE Department', 'Dean'),
-('', '', '', '', NULL, '', '', 'CITE DEPARTMENT', 'Faculty Member');
+('AD-123456', 'Ryan Valeriano', 'nama.alarcon.ui@phinmaed.com', 'Admin', NULL, '123456789', 'ryan.jpg', 'CITE Department', 'Dean');
 
 --
 -- Indexes for dumped tables
@@ -175,13 +162,13 @@ ALTER TABLE `reports`
 -- AUTO_INCREMENT for table `laboratory`
 --
 ALTER TABLE `laboratory`
-  MODIFY `lab_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `lab_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

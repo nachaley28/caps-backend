@@ -5,6 +5,7 @@ import json,random,csv,io
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
+from flask_mail import Mail, Message
 
 
 
@@ -20,6 +21,84 @@ CORS(app, origins="*",supports_credentials=True)
 mysql = MySQL(app)
 
 current_user = None
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'yourgmail@gmail.com'       # <--- change this
+app.config['MAIL_PASSWORD'] = 'your-app-password'         # <--- use Gmail App Password
+app.config['MAIL_DEFAULT_SENDER'] = ('Admin Reports', 'yourgmail@gmail.com')
+
+mail = Mail(app)
+
+# --- Send Report Email ---
+@app.route('/send_report_email', methods=['POST'])
+def send_report_email():
+    try:
+        data = request.get_json()
+        title = data.get('title')
+        summary = data.get('summary')
+        recipient = data.get('email')
+
+        if not (title and summary and recipient):
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+
+        # --- HTML Email Template ---
+        html_content = f"""
+        <html>
+        <head>
+          <style>
+            body {{
+              font-family: Arial, sans-serif;
+              background-color: #f8f9fa;
+              color: #333;
+              padding: 20px;
+            }}
+            .container {{
+              background: #fff;
+              border-radius: 10px;
+              padding: 20px;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+              max-width: 600px;
+              margin: auto;
+            }}
+            h2 {{
+              color: #006633;
+              border-bottom: 2px solid #006633;
+              padding-bottom: 10px;
+            }}
+            pre {{
+              background-color: #f4f4f4;
+              padding: 10px;
+              border-radius: 5px;
+              white-space: pre-wrap;
+            }}
+            p.footer {{
+              font-size: 12px;
+              color: #888;
+              text-align: center;
+              margin-top: 20px;
+            }}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h2>📋 {title}</h2>
+            <p>Below are the details of the selected reports:</p>
+            <pre>{summary}</pre>
+            <p class="footer">This report was automatically generated from the Admin Reports Dashboard.</p>
+          </div>
+        </body>
+        </html>
+        """
+
+        msg = Message(subject=f"📋 {title}", recipients=[recipient], html=html_content)
+        mail.send(msg)
+
+        return jsonify({'success': True, 'message': 'Email sent successfully!'})
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 UPLOAD_FOLDER = "uploads"
@@ -321,34 +400,31 @@ def add_laboratory():
 def get_data():
     cursor = mysql.connection.cursor()
 
-    # --- Fetch tables ---
     cursor.execute("SELECT * FROM users")
-    users = cursor.fetchall()  # user_id, name, ..., has_voted
+    users = cursor.fetchall()  
 
     cursor.execute("SELECT * FROM laboratory")
-    laboratories = cursor.fetchall()  # lab_id, lab_name, location
+    laboratories = cursor.fetchall() 
 
     cursor.execute("SELECT * FROM computer_equipments")
-    computer_equipments = cursor.fetchall()  # id, lab_name, pc_name
+    computer_equipments = cursor.fetchall() 
 
     cursor.execute("SELECT * FROM computer_status")
-    computer_status = cursor.fetchall()  # com_id, hdmi, headphone, keyboard, monitor, mouse, power, systemUnit, wifi, status_id
+    computer_status = cursor.fetchall()  
 
     cursor.execute("SELECT * FROM reports")
-    reports = cursor.fetchall()  # id, user_id, com_id, date, notes
+    reports = cursor.fetchall()  
 
-    # --- Summary stats ---
     total_users = len(users)
-    active_users = sum(1 for u in users if u[4] not in ("0", None))  # adjust index for has_voted
+    active_users = sum(1 for u in users if u[4] not in ("0", None)) 
     inactive_users = total_users - active_users
 
     total_labs = len(laboratories)
     total_computers = len(computer_equipments)
 
-    # Overall operational stats
     operational = not_operational = damaged = missing = 0
     for status in computer_status:
-        for s in status[1:9]:  # exclude com_id and status_id
+        for s in status[1:9]:  
             val = str(s).lower()
             if val == "operational":
                 operational += 1
@@ -361,7 +437,6 @@ def get_data():
 
     reports_submitted = len(reports)
 
-    # --- Computer parts status ---
     parts = ["wifi","headphone","keyboard","hdmi","monitor","mouse","power","systemUnit"]
     computerPartStatus = []
     for i, part in enumerate(parts):
@@ -377,7 +452,6 @@ def get_data():
             "missing": missing_count
         })
 
-    # --- Labs & Computers and Damage vs Missing ---
     labEquipments = []
     damageMissing = []
 
@@ -396,7 +470,6 @@ def get_data():
                         damaged_count += vals.count("damaged")
                         missing_count += vals.count("missing")
 
-        # Use "name" as key to match React
         labEquipments.append({
             "name": lab_name,
             "computers": total
@@ -410,7 +483,6 @@ def get_data():
 
     cursor.close()
 
-    # --- Print debug info ---
     print("labEquipments:", labEquipments)
     print("damageMissing:", damageMissing)
 
