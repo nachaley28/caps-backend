@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request,session,send_from_directory
 from flask_cors import CORS, cross_origin
 from flask_mysqldb import MySQL
-import json,random,csv,io
+import json,random,csv,io,ast
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
@@ -752,6 +752,80 @@ def send_report_email():
         receiver_email=context['recipient'],
         subject=f"System Report - {context['title']}",
         template_name='report.html',
+        context=context
+    )
+    return {"message": "Email send succesfully"}
+
+
+@app.route('/submit_technician_report', methods=['POST'])
+def submit_technician_report():
+    report_id = request.json.get('report_id')
+    issue_found = request.json.get('issue_found')
+    solution = request.json.get('solution')
+    status = request.json.get('status')
+    technician_email = request.json.get('technician_email')
+    part = issue_found['notes'].split()[0]
+    cur = mysql.connection.cursor()
+    fix_id = str(random.randint(11111111,99999999))
+    cur.execute("INSERT INTO technician_logs (report_id, fix_id, issue_found, solution, status, technician_email) VALUES (%s,%s,%s,%s,%s,%s)",(report_id,fix_id,issue_found,solution,status,technician_email))
+    mysql.connection.commit()
+
+    cur.execute(f"UPDATE computer_status set {part} = %s WHERE com_id = %s",(status,report_id))
+    mysql.connection.commit()
+    print(report_id,issue_found['notes'])
+    cur.execute("DELETE FROM reports WHERE com_id = %s AND notes = %s",(report_id,issue_found['notes']))
+    mysql.connection.commit()
+    print({
+        "report_id": report_id,
+        "issue_found": issue_found,
+        "solution": solution,
+        "status": status,
+        "technician_email": technician_email,
+        "part": part
+    })
+    return {"message": "report submitted successfully"}
+
+@app.route('/get_technician_logs')
+def get_technician_logs():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM technician_logs")
+    rows = cur.fetchall()
+    cur.close()
+
+    logs = []
+    for row in rows:
+        issue = ast.literal_eval(row[2])
+        logs.append({
+            "report_id": row[0],
+            "fix_id": row[1],
+            "issue_found":issue,
+            "isssolution_made": row[3],
+            "status": row[4],
+            "technician_email": row[5],
+            "timestamp": row[6].isoformat()
+        })
+
+    return jsonify(logs)
+
+
+@app.route('/technician_send_report_email',methods= ['POST'])
+def technician_send_report_email():
+    data = request.json.get('data')
+    print(data)
+    context = {
+        "title":data['title'],
+        "summary":data['issue_report'],
+        'recipient': ["justindelavega00@gmail.com","juag.delavega.ui@phinmaed.com"],
+        "position":data['position'],
+        "userEmail": data['userEmail']
+    }
+
+    send_templated_email(
+        sender_email='claims.pui@gmail.com',
+        sender_password='vxdk puti kyhc mdkr',
+        receiver_email=context['recipient'],
+        subject=f"Tecnician Logs - {context['title']}",
+        template_name='technician.html',
         context=context
     )
     return {"message": "Email send succesfully"}
