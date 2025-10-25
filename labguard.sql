@@ -2,10 +2,10 @@
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1
--- Generation Time: Oct 13, 2025 at 05:26 PM
--- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- Host: localhost
+-- Generation Time: Oct 25, 2025 at 02:33 PM
+-- Server version: 10.4.28-MariaDB
+-- PHP Version: 8.2.4
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -68,9 +68,9 @@ CREATE TABLE `computer_status` (
 --
 
 INSERT INTO `computer_status` (`com_id`, `hdmi`, `headphone`, `keyboard`, `monitor`, `mouse`, `power`, `systemUnit`, `wifi`, `status_id`) VALUES
-('66162603', 'operational', 'operational', 'operational', 'missing', 'operational', 'operational', 'operational', 'operational', 38181049),
+('66162603', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 38181049),
 ('89523799', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 'operational', 17587907),
-('65351747', 'operational', 'operational', 'damaged', 'operational', 'operational', 'operational', 'operational', 'operational', 82702591);
+('65351747', 'operational', 'operational', 'missing', 'notOperational', 'operational', 'damaged', 'operational', 'damaged', 82702591);
 
 -- --------------------------------------------------------
 
@@ -121,9 +121,34 @@ INSERT INTO `reports` (`id`, `com_id`, `part`, `status`, `lab`, `submitted_by`, 
 (24, '44872654', NULL, 'Notoperational', '1', 'System', 'hdmi issue detected', '2025-10-12 09:29:13'),
 (25, '44872654', NULL, 'Notoperational', '1', 'System', 'headphone issue detected', '2025-10-12 10:13:59'),
 (26, '78223936', NULL, 'Damaged', '1', 'System', 'hdmi issue detected', '2025-10-12 10:20:39'),
-(27, '65351747', NULL, 'Damaged', '10', 'System', 'keyboard issue detected', '2025-10-13 15:23:19'),
 (28, '89523799', NULL, 'Notoperational', '10', 'System', 'power issue detected', '2025-10-13 15:23:43'),
-(29, '66162603', NULL, 'Notoperational', '90', 'System', 'monitor issue detected', '2025-10-13 15:24:08');
+(42, '65351747', NULL, 'Missing', '10', 'System', 'keyboard issue detected', '2025-10-23 06:22:14'),
+(43, '65351747', NULL, 'Notoperational', '10', 'System', 'monitor issue detected', '2025-10-23 06:22:14'),
+(44, '65351747', NULL, 'Damaged', '10', 'System', 'power issue detected', '2025-10-23 06:22:14'),
+(45, '65351747', NULL, 'Damaged', '10', 'System', 'wifi issue detected', '2025-10-23 06:22:14');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `technician_logs`
+--
+
+CREATE TABLE `technician_logs` (
+  `report_id` text NOT NULL,
+  `fix_id` text NOT NULL,
+  `issue_found` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `solution` text NOT NULL,
+  `status` text NOT NULL,
+  `technician_email` text NOT NULL,
+  `fix_time` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `technician_logs`
+--
+
+INSERT INTO `technician_logs` (`report_id`, `fix_id`, `issue_found`, `solution`, `status`, `technician_email`, `fix_time`) VALUES
+('65351747', '40569113', '{\'lab\': \'10\', \'PC_Number\': \'2\', \'status\': \'Notoperational\', \'notes\': \'headphone issue detected\'}', 'hehe', 'operational', '1@gmail.com', '2025-10-23 15:06:10');
 
 -- --------------------------------------------------------
 
@@ -149,7 +174,8 @@ CREATE TABLE `users` (
 
 INSERT INTO `users` (`lgid`, `name`, `email`, `role`, `year`, `password`, `profile`, `department`, `position`) VALUES
 ('AD-123456', 'Ryan Valeriano', 'rcvaleriano.ui@phinmaed.com', 'Admin', NULL, '123456789', 'ryan.jpg', 'CITE Department', 'Dean'),
-('', '', '', '', NULL, '', '', 'CITE DEPARTMENT', 'Faculty Member');
+('', '', '', '', NULL, '', '', 'CITE DEPARTMENT', 'Faculty Member'),
+('10', '1', '1@gmail.com', 'ITSD', '1', '1', '2024-06-13-222542610.jpeg', 'Not specified', 'Not Specified');
 
 --
 -- Indexes for dumped tables
@@ -181,7 +207,7 @@ ALTER TABLE `laboratory`
 -- AUTO_INCREMENT for table `reports`
 --
 ALTER TABLE `reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
