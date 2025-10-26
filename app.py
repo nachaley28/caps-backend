@@ -307,6 +307,11 @@ def add_laboratory():
 
     cursor = mysql.connection.cursor()
 
+    cursor.execute("SELECT lab_name FROM laboratory WHERE lab_name = %s",(lab_name,))
+    existing_lab = cursor.fetchone()
+    if existing_lab:
+        return {"error": "Laboratory with this name already exists."}, 400
+
     cursor.execute("INSERT INTO laboratory (lab_name, location) VALUES (%s,%s)",(lab_name,location,))
     mysql.connection.commit()
 
@@ -381,7 +386,6 @@ def get_data():
     # --- Labs & Computers and Damage vs Missing ---
     labEquipments = []
     damageMissing = []
-    print("computer status: ",computer_status)
 
     for lab in laboratories:
         lab_id, lab_name, location = lab
@@ -395,10 +399,8 @@ def get_data():
                     print("status: ", status[0], "comp_id: ", comp_id)
                     if status[0] == comp_id:
                         vals = [str(x).lower() for x in status[1:9]]
-                        print("Vals:" ,vals)
                         damaged_count += vals.count("damaged")
                         missing_count += vals.count("missing")
-                        print(damaged_count,"damage",missing_count,"missing")
 
         # Use "name" as key to match React
         labEquipments.append({
@@ -848,6 +850,8 @@ def logout():
     current_user = None
     session.pop("user", None)
     return {"message": "Logged out"}
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
