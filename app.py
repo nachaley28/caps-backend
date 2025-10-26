@@ -381,21 +381,24 @@ def get_data():
     # --- Labs & Computers and Damage vs Missing ---
     labEquipments = []
     damageMissing = []
+    print("computer status: ",computer_status)
 
     for lab in laboratories:
         lab_id, lab_name, location = lab
         total = sum(1 for comp in computer_equipments if comp[1] == lab_name)
-
         damaged_count = 0
         missing_count = 0
         for comp in computer_equipments:
             if comp[1] == lab_name:
-                comp_id = comp[0]
+                comp_id = comp[3]
                 for status in computer_status:
+                    print("status: ", status[0], "comp_id: ", comp_id)
                     if status[0] == comp_id:
                         vals = [str(x).lower() for x in status[1:9]]
+                        print("Vals:" ,vals)
                         damaged_count += vals.count("damaged")
                         missing_count += vals.count("missing")
+                        print(damaged_count,"damage",missing_count,"missing")
 
         # Use "name" as key to match React
         labEquipments.append({
