@@ -182,7 +182,14 @@ def delete_lab(lab_name):
         cursor = mysql.connection.cursor()
         cursor.execute("DELETE FROM laboratory WHERE lab_name = %s", (lab_name,))
         mysql.connection.commit()
+        cursor.execute("SELECT id FROM computer_equipments WHERE lab_name = %s", (lab_name,))
+        computer_id = cursor.fetchone()[0]
+        print("Computer ID : ",computer_id)
         cursor.execute("DELETE FROM computer_equipments WHERE lab_name = %s", (lab_name,))
+        mysql.connection.commit()
+        cursor.execute("DELETE FROM computer_status WHERE com_id = %s", (computer_id,))
+        mysql.connection.commit()
+        cursor.execute("DELETE FROM reports WHERE com_id = %s", (computer_id,))
         mysql.connection.commit()
         cursor.close()
         return {"message": "Lab deleted"}, 200
@@ -194,6 +201,10 @@ def delete_computer(id):
     try:
         cursor = mysql.connection.cursor()
         cursor.execute("DELETE FROM computer_equipments WHERE id = %s", (id,))
+        mysql.connection.commit()
+        cursor.execute("DELETE FROM computer_status WHERE com_id = %s", (id,))
+        mysql.connection.commit()
+        cursor.execute("DELETE FROM reports WHERE com_id = %s", (id,))
         mysql.connection.commit()
         cursor.close()
         return {"message": "Lab deleted"}, 200
@@ -535,7 +546,7 @@ def add_computer():
         pc_name = data.get('name')
         lab_name = data.get('lab_name')
         spec = data.get('spec')
-
+        print("Lab ID",lab_id)
         random_id = str(random.randint(11111111, 99999999))
         status_id = str(random.randint(11111111, 99999999))
 
