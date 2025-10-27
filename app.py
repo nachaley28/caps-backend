@@ -746,7 +746,7 @@ def send_report_email():
     context = {
         "title":title,
         "summary":summary,
-        'recipient': ["justindelavega00@gmail.com","juag.delavega.ui@phinmaed.com"],
+        'recipient': ["nama.alarcon.ui@phinmaed.com"],
         "position":position,
         "userEmail": userEmail
     }
@@ -820,7 +820,7 @@ def technician_send_report_email():
     context = {
         "title":data['title'],
         "summary":data['issue_report'],
-        'recipient': ["justindelavega00@gmail.com","juag.delavega.ui@phinmaed.com"],
+        'recipient': ["nama.alarcon.ui@phinmaed.com"],
         "position":data['position'],
         "userEmail": data['userEmail']
     }
