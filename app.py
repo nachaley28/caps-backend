@@ -425,8 +425,7 @@ def get_data():
 
     cursor.close()
 
-    print("labEquipments:", labEquipments)
-    print("damageMissing:", damageMissing)
+    
 
     return jsonify({
         "stats": {
@@ -484,7 +483,7 @@ def get_computers():
                 "parts": json.loads(row[3]) if row[3] else {}
             })
 
-        print(computers)
+        
 
         return jsonify(computers)
     except Exception as e:
@@ -517,22 +516,7 @@ def get_computer_statuses():
     
     
 
-@app.route('/update_computer_status', methods=['POST'])
-def update_status():
-    data = request.json
-    print(data)
-    comp_id = data.get("compId")
-    statuses = data.get("statuses", {})
 
-    cursor = mysql.connection.cursor()
-
-    for part, status in statuses.items():
-        query = f"UPDATE computer_status SET {part} = %s WHERE com_id = %s"
-        cursor.execute(query, (status, comp_id))
-
-    mysql.connection.commit()
-    cursor.close()
-    return jsonify({"success": True})
 
 
 @app.route('/computer', methods=['POST'])
@@ -543,17 +527,27 @@ def add_computer():
         pc_name = data.get('name')
         lab_name = data.get('lab_name')
         spec = data.get('spec')
-        print("Lab ID",lab_id)
+
         random_id = str(random.randint(11111111, 99999999))
         status_id = str(random.randint(11111111, 99999999))
 
         cur = mysql.connection.cursor()
 
+        # ✅ Check if the same PC name already exists in the same lab
         cur.execute(
-            "INSERT INTO computer_equipments (pc_name, lab_name, specs, id,lab_id) VALUES (%s, %s, %s, %s,%s)",
-            (pc_name, lab_name, spec, random_id,lab_id)
+            "SELECT COUNT(*) FROM computer_equipments WHERE lab_name = %s AND pc_name = %s",
+            (lab_name, pc_name)
         )
-        
+        exists = cur.fetchone()[0]
+        if exists > 0:
+            cur.close()
+            return jsonify({"error": f"Computer name '{pc_name}' already exists in lab '{lab_name}'."}), 400
+
+        # ✅ Insert new computer if unique
+        cur.execute(
+            "INSERT INTO computer_equipments (pc_name, lab_name, specs, id, lab_id) VALUES (%s, %s, %s, %s, %s)",
+            (pc_name, lab_name, spec, random_id, lab_id)
+        )
         mysql.connection.commit()
 
         cur.execute(
@@ -574,130 +568,130 @@ def add_computer():
     except Exception as e:
         print(e)
         return jsonify({"error": str(e)}), 500
-    
-@app.route('/computer/bulk',methods=['POST'])
+
+@app.route('/computer/bulk', methods=['POST'])
 def computer_bulk():
-    comp_id = ''
-    pc_name = ''
-    lab_name= ''
-    spec = None
     data = request.json.get('data')
-    print(data)
+    inserted_computers = []
+    skipped = []
+
     for computer in data:
-        print(computer)
         try:
             pc_name = computer['pc_name']
-            print(pc_name)
             lab_name = computer['lab_name']
             spec = computer['specs']
-            id = random.randint(11111111, 99999999)
+
             cur = mysql.connection.cursor()
+
+            # ✅ Skip duplicates
             cur.execute(
-                "INSERT INTO computer_equipments (pc_name, lab_name, specs,id) VALUES (%s, %s, %s,%s)",
-                (pc_name, lab_name, spec,str(id))
+                "SELECT COUNT(*) FROM computer_equipments WHERE lab_name = %s AND pc_name = %s",
+                (lab_name, pc_name)
+            )
+            exists = cur.fetchone()[0]
+            if exists > 0:
+                skipped.append(pc_name)
+                cur.close()
+                continue
+
+            id = str(random.randint(11111111, 99999999))
+            cur.execute(
+                "INSERT INTO computer_equipments (pc_name, lab_name, specs, id) VALUES (%s, %s, %s, %s)",
+                (pc_name, lab_name, spec, id)
             )
             mysql.connection.commit()
-            comp_id = cur.lastrowid
-            id_status = random.randint(11111111, 99999999)
-            cur.execute('INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)',(str(id),str(id_status)))
+
+            id_status = str(random.randint(11111111, 99999999))
+            cur.execute(
+                "INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)",
+                (id, id_status)
+            )
             mysql.connection.commit()
-            
+
             cur.close()
 
-            
+            inserted_computers.append({
+                "id": id,
+                "pcNumber": pc_name,
+                "lab": lab_name,
+                "parts": json.loads(spec)
+            })
+
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-    
+
     return jsonify({
-        "id": comp_id,
-        "pcNumber": pc_name,
-        "lab": lab_name,
-        "parts": json.loads(spec)
+        "inserted": inserted_computers,
+        "skipped_duplicates": skipped
     })
 
-      
+@app.route('/update_computer_status_bulk', methods=['POST'])
+def update_computer_status_bulk():
+    data = request.json
+    all_statuses = data.get("statuses", {})
+
+    if not all_statuses:
+        return jsonify({"error": "No statuses provided"}), 400
+
+    cursor = mysql.connection.cursor()
+    try:
+        valid_parts = ["monitor", "systemUnit", "keyboard", "mouse", "headphone", "hdmi", "power", "wifi"]
+
+        for comp_id_str, parts in all_statuses.items():
+            comp_id = int(comp_id_str)  # ensure numeric for MySQL
+            for part, status in parts.items():
+                if part not in valid_parts:
+                    continue
+                query = f"UPDATE computer_status SET {part} = %s WHERE com_id = %s"
+                cursor.execute(query, (status, comp_id))
+
+        mysql.connection.commit()
+        return jsonify({"success": True, "message": "All selected PCs updated!"})
+
+    except Exception as e:
+        print("Error updating PCs:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+
+
+@app.route('/update_computer_status', methods=['POST'])
+def update_status():
+    data = request.json
+    comp_id = data.get("compId")
+    statuses = data.get("statuses", {})
+
+    cursor = mysql.connection.cursor()
+
+    for part, status in statuses.items():
+        query = f"UPDATE computer_status SET {part} = %s WHERE com_id = %s"
+        cursor.execute(query, (status, comp_id))
+
+    mysql.connection.commit()
+    cursor.close()
+    return jsonify({"success": True})
+
+
 @app.route('/get_admin_computer_reports')
 def get_admin_computer_reports():
     cur = mysql.connection.cursor()
-    cur.execute("SELECT * FROM computer_status")
+    cur.execute("SELECT * FROM reports ORDER BY created_at DESC")
     rows = cur.fetchall()
+    cur.close()
 
     reports = []
     for row in rows:
-        com_id, hdmi, headphone, keyboard, monitor, mouse, power, systemUnit, wifi, status_id = row
+        reports.append({
+            "id": row[0],
+            "com_id": row[1],
+            "lab": row[2],
+            "status": row[3],
+            "date": row[4],  # keep as string
+            "notes": row[5],
+            "sent": bool(row[6])
+        })
 
-        parts = {
-            "hdmi": hdmi,
-            "headphone": headphone,
-            "keyboard": keyboard,
-            "monitor": monitor,
-            "mouse": mouse,
-            "power": power,
-            "systemUnit": systemUnit,
-            "wifi": wifi,
-        }
-
-        for part, status in parts.items():
-            if status != "operational":
-                cur.execute(
-                    "SELECT lab_name, pc_name FROM computer_equipments WHERE id = %s",
-                    (com_id,)
-                )
-                result = cur.fetchone()
-                if not result:
-                    continue
-                lab_name, pc_name = result
-                notes = f"{part} issue detected"
-
-                # Check if report already exists
-                cur.execute(
-                    "SELECT id, com_id, lab, status, created_at, notes, sent FROM reports WHERE com_id = %s AND notes = %s",
-                    (com_id, notes)
-                )
-                report_fetch = cur.fetchone()
-
-                if report_fetch:
-                    report = {
-                        "id": report_fetch[0],
-                        "item": pc_name,
-                        "lab": lab_name,
-                        "status": report_fetch[3],
-                        "date": report_fetch[4].isoformat(),
-                        "notes": report_fetch[5],
-                        "sent": bool(report_fetch[6])
-                    }
-                    reports.append(report)
-                    continue
-
-                # Create new report if not exists
-                report_date = datetime.now()
-                report = {
-                    "id": status_id,
-                    "item": pc_name,
-                    "lab": lab_name,
-                    "status": status.capitalize(),
-                    "date": report_date.isoformat(),
-                    "notes": notes,
-                    "sent": False
-                }
-
-                cur.execute(
-                    """
-                    INSERT INTO reports (com_id, lab, status, created_at, notes, sent)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    """,
-                    (com_id, lab_name, report["status"], report_date, notes, 0)
-                )
-                reports.append(report)
-
-    mysql.connection.commit()
-    cur.close()
-
-    reports.sort(key=lambda x: datetime.fromisoformat(x["date"]), reverse=True)
-    return jsonify(reports)  
-
-
-
+    return jsonify(reports)
 
 
 @app.route('/get_accessories', methods=["GET"])
@@ -854,7 +848,7 @@ def get_technician_logs():
             "status": row[4],
             "technician_email": row[5],
             "timestamp": row[6].isoformat(),
-            "sent": bool(row[7])  # <-- Add this line, assuming 'sent' is the 8th column
+            "sent": bool(row[7])  
         })
 
     return jsonify(logs)
