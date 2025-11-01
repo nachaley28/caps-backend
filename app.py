@@ -417,7 +417,7 @@ def get_data():
             if comp[1] == lab_name:
                 comp_id = comp[3]
                 for status in computer_status:
-                    print("status: ", status[0], "comp_id: ", comp_id)
+                   
                     if status[0] == comp_id:
                         vals = [str(x).lower() for x in status[1:9]]
                         damaged_count += vals.count("damaged")
@@ -478,7 +478,34 @@ def get_laboratory():
 
     return final_data
 
+@app.route('/update_computer_status_bulk', methods=['POST'])
+def update_computer_status_bulk():
+    data = request.json
+    all_statuses = data.get("statuses", {})
 
+    if not all_statuses:
+        return jsonify({"error": "No statuses provided"}), 400
+
+    cursor = mysql.connection.cursor()
+    try:
+        valid_parts = ["monitor", "systemUnit", "keyboard", "mouse", "headphone", "hdmi", "power", "wifi"]
+
+        for comp_id_str, parts in all_statuses.items():
+            comp_id = int(comp_id_str)  # ensure numeric for MySQL
+            for part, status in parts.items():
+                if part not in valid_parts:
+                    continue
+                query = f"UPDATE computer_status SET {part} = %s WHERE com_id = %s"
+                cursor.execute(query, (status, comp_id))
+
+        mysql.connection.commit()
+        return jsonify({"success": True, "message": "All selected PCs updated!"})
+
+    except Exception as e:
+        print("Error updating PCs:", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
 
 @app.route('/get_computers', methods=['GET'])
 def get_computers():
@@ -497,7 +524,7 @@ def get_computers():
                 "parts": json.loads(row[3]) if row[3] else {}
             })
 
-        print(computers)
+        
 
         return jsonify(computers)
     except Exception as e:
@@ -549,7 +576,7 @@ def get_other_parts_status():
 @app.route('/update_computer_status', methods=['POST'])
 def update_status():
     data = request.json
-    print(data)
+    
     comp_id = data.get("compId")
     statuses = data.get("statuses", {})
 
@@ -564,107 +591,11 @@ def update_status():
     return jsonify({"success": True})
 
 
-@app.route('/computer', methods=['POST'])
-def add_computer():
-    try:
-        data = request.json.get('data')
-        other_parts = json.loads(data.get('other_parts'))
-        print(other_parts)
-        lab_id = data.get('id')
-        pc_name = data.get('name')
-        lab_name = data.get('lab_name')
-        spec = data.get('spec')
-        parts = {}
-        parts_status = {}
-
-        for other in other_parts:
-            parts[other['name']] = other['serial']
-
-        for other in other_parts:
-            parts_status[other['name']] = 'operational'
-
-        random_id = str(random.randint(11111111, 99999999))
-        status_id = str(random.randint(11111111, 99999999))
-
-        cur = mysql.connection.cursor()
-        
-        other_final = json.dumps(parts)
-        status_final = json.dumps(parts_status)
-        print(other_final)
-        cur.execute(
-            "INSERT INTO computer_equipments (pc_name, lab_name, specs, id,lab_id,other_parts) VALUES (%s, %s, %s, %s,%s,%s)",
-            (pc_name, lab_name, spec, random_id,lab_id,str(other_final))
-        )
-        
-        mysql.connection.commit()
-
-        cur.execute(
-            "INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)",
-            (random_id, status_id)
-        )
-        print(parts_status)
-        mysql.connection.commit()
-        cur.execute(
-            "INSERT INTO other_parts_status (com_id,parts,status_id) VALUES (%s,%s, %s)",
-            (random_id,str(status_final) ,status_id)
-        )
-        mysql.connection.commit()
-
-        cur.close()
-
-        return jsonify({
-            "id": random_id,
-            "pcNumber": pc_name,
-            "lab": lab_name,
-            "parts": json.loads(spec)
-        })
-
-    except Exception as e:
-        print(e)
-        return jsonify({"error": str(e)}), 500
-    
-@app.route('/computer/bulk',methods=['POST'])
-def computer_bulk():
-    comp_id = ''
-    pc_name = ''
-    lab_name= ''
-    spec = None
-    data = request.json.get('data')
-    print(data)
-    for computer in data:
-        print(computer)
-        try:
-            pc_name = computer['pc_name']
-            print(pc_name)
-            lab_name = computer['lab_name']
-            spec = computer['specs']
-            id = random.randint(11111111, 99999999)
-            cur = mysql.connection.cursor()
-            cur.execute(
-                "INSERT INTO computer_equipments (pc_name, lab_name, specs,id) VALUES (%s, %s, %s,%s)",
-                (pc_name, lab_name, spec,str(id))
-            )
-            mysql.connection.commit()
-            comp_id = cur.lastrowid
-            id_status = random.randint(11111111, 99999999)
-            cur.execute('INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)',(str(id),str(id_status)))
-            mysql.connection.commit()
-            
-            cur.close()
-
-            
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-    
-    return jsonify({
-        "id": comp_id,
-        "pcNumber": pc_name,
-        "lab": lab_name,
-        "parts": json.loads(spec)
-    })
 
       
     
+
+
 
 @app.route('/get_admin_computer_reports')
 def get_admin_computer_reports():
@@ -698,43 +629,44 @@ def get_admin_computer_reports():
                     continue
                 lab_name, pc_name = result
                 notes = f"{part} issue detected"
+
+                # Check if the report already exists
                 cur.execute(
-                    "SELECT * FROM reports WHERE com_id = %s AND notes = %s",
-                    (com_id,notes,)
+                    "SELECT id, status, created_at, sent FROM reports WHERE com_id = %s AND notes = %s",
+                    (com_id, notes)
                 )
                 report_fetch = cur.fetchone()
+
                 if report_fetch:
-                    report = {
-                        "id": report_fetch[1],
-                        "item": pc_name,
-                        "lab": lab_name,
-                        "status": report_fetch[3],
-                        "date": report_fetch[7].isoformat(),
-                        "notes": report_fetch[6],
-                    }
-                    reports.append(report)
-                    continue
-                report_date = datetime.now()
-                report = {
-                    "id": status_id,
+                    report_id, status_text, created_at, sent = report_fetch
+                else:
+                    # Insert new report
+                    created_at = datetime.now()
+                    sent = 0  # Default to 0 (not sent)
+                    cur.execute(
+                        """
+                        INSERT INTO reports (com_id, lab, status, created_at, notes, sent)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (com_id, lab_name, status.capitalize(), created_at, notes, sent)
+                    )
+                    mysql.connection.commit()
+                    report_id = cur.lastrowid
+                    status_text = status.capitalize()
+
+                # Append to response
+                reports.append({
+                    "id": report_id,
                     "item": pc_name,
                     "lab": lab_name,
-                    "status": status.capitalize(),
-                    "date": report_date.isoformat(),
-                    "notes": f"{part} issue detected",
-                }
-                
+                    "status": status_text,
+                    "date": created_at.isoformat(),
+                    "notes": notes,
+                    "sent": sent
+                })
 
-                cur.execute(
-                    """
-                    INSERT INTO reports (com_id, lab, status, created_at, notes)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (com_id, lab_name, report["status"], report_date, report["notes"])
-                )
-
-    mysql.connection.commit()
     cur.close()
+    # Sort by date descending
     reports.sort(key=lambda x: datetime.fromisoformat(x["date"]), reverse=True)
     return jsonify(reports)
 
@@ -786,14 +718,119 @@ def labs_pc_count():
         rows = cur.fetchall()
         cur.close()
         lab_counts = [{"lab_name": lab, "count": count} for lab, count in rows]
-        print(lab_counts)
+        
         return jsonify(lab_counts)
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/computer', methods=['POST'])
+def add_computer():
+    try:
+        data = request.json.get('data')
+        lab_id = data.get('id')
+        pc_name = data.get('name')
+        lab_name = data.get('lab_name')
+        spec = data.get('spec')
 
-@app.route('/send_report_email',methods= ['POST'])
+        random_id = str(random.randint(11111111, 99999999))
+        status_id = str(random.randint(11111111, 99999999))
+
+        cur = mysql.connection.cursor()
+
+        # ✅ Check if the same PC name already exists in the same lab
+        cur.execute(
+            "SELECT COUNT(*) FROM computer_equipments WHERE lab_name = %s AND pc_name = %s",
+            (lab_name, pc_name)
+        )
+        exists = cur.fetchone()[0]
+        if exists > 0:
+            cur.close()
+            return jsonify({"error": f"Computer name '{pc_name}' already exists in lab '{lab_name}'."}), 400
+
+        # ✅ Insert new computer if unique
+        cur.execute(
+            "INSERT INTO computer_equipments (pc_name, lab_name, specs, id, lab_id) VALUES (%s, %s, %s, %s, %s)",
+            (pc_name, lab_name, spec, random_id, lab_id)
+        )
+        mysql.connection.commit()
+
+        cur.execute(
+            "INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)",
+            (random_id, status_id)
+        )
+        mysql.connection.commit()
+
+        cur.close()
+
+        return jsonify({
+            "id": random_id,
+            "pcNumber": pc_name,
+            "lab": lab_name,
+            "parts": json.loads(spec)
+        })
+
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/computer/bulk', methods=['POST'])
+def computer_bulk():
+    data = request.json.get('data')
+    inserted_computers = []
+    skipped = []
+
+    for computer in data:
+        try:
+            pc_name = computer['pc_name']
+            lab_name = computer['lab_name']
+            spec = computer['specs']
+
+            cur = mysql.connection.cursor()
+
+            # ✅ Skip duplicates
+            cur.execute(
+                "SELECT COUNT(*) FROM computer_equipments WHERE lab_name = %s AND pc_name = %s",
+                (lab_name, pc_name)
+            )
+            exists = cur.fetchone()[0]
+            if exists > 0:
+                skipped.append(pc_name)
+                cur.close()
+                continue
+
+            id = str(random.randint(11111111, 99999999))
+            cur.execute(
+                "INSERT INTO computer_equipments (pc_name, lab_name, specs, id) VALUES (%s, %s, %s, %s)",
+                (pc_name, lab_name, spec, id)
+            )
+            mysql.connection.commit()
+
+            id_status = str(random.randint(11111111, 99999999))
+            cur.execute(
+                "INSERT INTO computer_status (com_id, status_id) VALUES (%s, %s)",
+                (id, id_status)
+            )
+            mysql.connection.commit()
+
+            cur.close()
+
+            inserted_computers.append({
+                "id": id,
+                "pcNumber": pc_name,
+                "lab": lab_name,
+                "parts": json.loads(spec)
+            })
+
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    return jsonify({
+        "inserted": inserted_computers,
+        "skipped_duplicates": skipped
+    })
+
+@app.route('/send_report_email', methods=['POST'])
 def send_report_email():
     cur = mysql.connection.cursor()
     
@@ -801,29 +838,40 @@ def send_report_email():
     summary = request.json.get('summary')
     position = request.json.get('position')
     userEmail = request.json.get('userEmail')
-    print(summary)
+    
     context = {
-        "title":title,
-        "summary":summary,
-        'recipient': ["justindelavega00@gmail.com","juag.delavega.ui@phinmaed.com"],
-        "position":position,
+        "title": title,
+        "summary": summary,
+        "recipient": [
+            "justindelavega00@gmail.com",
+            "juag.delavega.ui@phinmaed.com",
+            "nama.alarcom.ui@phinmaed.com"
+        ],
+        "position": position,
         "userEmail": userEmail
     }
 
-    # send_templated_email(
-    #     sender_email='claims.pui@gmail.com',
-    #     sender_password='vxdk puti kyhc mdkr',
-    #     receiver_email=context['recipient'],
-    #     subject=f"System Report - {context['title']}",
-    #     template_name='report.html',
-    #     context=context
-    # )
+    # Send the email
+    send_templated_email(
+        sender_email='claims.pui@gmail.com',
+        sender_password='vxdk puti kyhc mdkr',
+        receiver_email=context['recipient'],
+        subject=f"System Report - {context['title']}",
+        template_name='report.html',
+        context=context
+    )
+
+    # Update reports as sent
     for item in summary:
-        cur.execute("UPDATE reports SET sent= 1 WHERE com_id = %s AND notes = %s",(item['com_id'],item['notes']))
+        cur.execute(
+            "UPDATE reports SET sent = 1 WHERE id = %s",
+            (item['com_id'],)
+        )
         mysql.connection.commit()
-    return {"message": "Email send succesfully"}
 
+    return {"message": "Email sent successfully"}
 
+    
 @app.route('/submit_technician_report', methods=['POST'])
 def submit_technician_report():
     report_id = request.json.get('report_id')
@@ -866,24 +914,26 @@ def get_technician_logs():
             "report_id": row[0],
             "fix_id": row[1],
             "issue_found":issue,
-            "isssolution_made": row[3],
+            "solution": row[3],
             "status": row[4],
             "technician_email": row[5],
-            "timestamp": row[6].isoformat()
+            "timestamp": row[6].isoformat(),
+             "sent": row[7]
+             
         })
 
     return jsonify(logs)
 
 
-@app.route('/technician_send_report_email',methods= ['POST'])
+@app.route('/technician_send_report_email', methods=['POST'])
 def technician_send_report_email():
     data = request.json.get('data')
     print(data)
     context = {
-        "title":data['title'],
-        "summary":data['issue_report'],
-        'recipient': ["justindelavega00@gmail.com","juag.delavega.ui@phinmaed.com"],
-        "position":data['position'],
+        "title": data['title'],
+        "summary": data['issue_report'],
+        'recipient': ["justindelavega00@gmail.com", "juag.delavega.ui@phinmaed.com"],
+        "position": data['position'],
         "userEmail": data['userEmail']
     }
 
@@ -891,11 +941,28 @@ def technician_send_report_email():
         sender_email='claims.pui@gmail.com',
         sender_password='vxdk puti kyhc mdkr',
         receiver_email=context['recipient'],
-        subject=f"Tecnician Logs - {context['title']}",
+        subject=f"Technician Logs - {context['title']}",
         template_name='technician.html',
         context=context
     )
-    return {"message": "Email send succesfully"}
+
+    # Update the technician logs as sent
+    report_ids = [item['report_id'] for item in data['issue_report']]
+    
+    if report_ids:
+        try:
+            cursor = mysql.connection.cursor()
+            format_strings = ','.join(['%s'] * len(report_ids))
+            query = f"UPDATE technician_logs SET sent = 1 WHERE report_id IN ({format_strings})"
+            cursor.execute(query, tuple(report_ids))
+            mysql.connection.commit()
+            cursor.close()
+        except Exception as e:
+            print(f"Error updating sent status: {e}")
+            return {"message": "Error updating logs", "error": str(e)}, 500
+
+    return {"message": "Email sent successfully and logs updated"}
+
 
 
 @app.route("/check_session")
